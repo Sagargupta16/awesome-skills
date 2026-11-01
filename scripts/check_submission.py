@@ -37,7 +37,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+import check_new_links
 import gitref
+import validate
 
 API = "https://api.github.com"
 
@@ -438,13 +440,8 @@ def parse_rows(text: str) -> dict:
     return rows
 
 
-def added_rows(base_ref: str) -> list:
-    """Entries present at HEAD but not at the base.
-
-    Compares the two parsed entry sets rather than reading `+` lines from the
-    diff. Reordering a table rewrites every moved row, so a diff-based reading
-    reports untouched entries as new submissions and then blocks the pull
-    request over rot that was already on the base branch.
+def base_readme(base_ref: str) -> str | None:
+    """README.md at `base_ref`, or None when the ref is malformed or unreadable.
 
     `base_ref` arrives from a command line, so it is checked against the shape of
     a git ref first. Nothing is run through a shell, but a value beginning with
@@ -455,7 +452,7 @@ def added_rows(base_ref: str) -> list:
             f"error: {base_ref!r} is not a valid git ref for --base-ref",
             file=sys.stderr,
         )
-        return []
+        return None
 
     text, detail = gitref.show(base_ref, "README.md")
     if text is None:
@@ -463,19 +460,64 @@ def added_rows(base_ref: str) -> list:
             f"warning: could not read README.md at {base_ref}: {detail}",
             file=sys.stderr,
         )
-        return []
+    return text
 
+
+def added_rows(base_ref: str) -> list:
+    """Entries present at HEAD but not at the base.
+
+    Compares the two parsed entry sets rather than reading `+` lines from the
+    diff. Reordering a table rewrites every moved row, so a diff-based reading
+    reports untouched entries as new submissions and then blocks the pull
+    request over rot that was already on the base branch.
+    """
+    text = base_readme(base_ref)
+    if text is None:
+        return []
     before = parse_rows(text)
     after = parse_rows(Path("README.md").read_text(encoding="utf-8"))
     return [sub for key, sub in after.items() if key not in before]
 
 
+def added_links(base_ref: str, rows: list) -> list:
+    """Links new to README.md that are not one of `rows`, each held for a maintainer.
+
+    Only a skill table row is checked for a SKILL.md and a licence. Any other
+    new link, such as a bullet in Official or Tools (a vendor repository, a tool
+    or an article), a bullet with another list marker, a link in prose, or a row
+    the table parser cannot read, used to pass as "No new entries" and merge
+    itself, so CONTRIBUTING.md has a maintainer add those.
+    """
+    text = base_readme(base_ref)
+    if text is None:
+        return []
+    known = {validate.normalize_url(u) for u in check_new_links.links_in(text)}
+    known |= {validate.normalize_url(s.url) for s in rows}
+    head = check_new_links.links_in(Path("README.md").read_text(encoding="utf-8"))
+    held = []
+    for url in sorted(head):
+        if validate.normalize_url(url) in known:
+            continue
+        sub = Submission(url, url, "", "")
+        sub.hard.append(
+            "Adds a link outside the skill tables (a bullet, a link in prose, or a "
+            "row the table check cannot read), which the gate does not check for a "
+            f"SKILL.md or a licence. A maintainer reviews it and applies "
+            f"`{OVERRIDE_LABEL}` to merge it."
+        )
+        held.append(sub)
+    return held
+
+
 def inspect(sub: Submission) -> None:
     target = parse_github_url(sub.url)
     if target is None:
-        sub.soft.append(
-            "Not a GitHub repository or folder URL, so it cannot be checked "
-            "automatically. A maintainer must verify it by hand."
+        # Blocking, not a note: a note never stops auto-merge, so the entry would
+        # land with no SKILL.md, licence or activity check at all.
+        sub.hard.append(
+            "Not a GitHub repository or folder URL, so it cannot be checked for a "
+            "SKILL.md, a licence or recent activity. A maintainer checks it by hand "
+            f"and applies `{OVERRIDE_LABEL}` to merge it."
         )
         return
 
@@ -520,7 +562,11 @@ def lookup_repo(sub: Submission, slug: str) -> dict | None:
                 f"`{slug}` returns 404. The repository is private, renamed, or deleted."
             )
         else:
-            sub.soft.append(f"Could not reach the GitHub API for `{slug}` ({err}).")
+            # A failed lookup verified nothing, so it fails closed.
+            sub.hard.append(
+                f"Could not reach the GitHub API for `{slug}` ({err}), so nothing "
+                f"about this entry was verified. Re-run the check."
+            )
         return None
 
     stale_days = days_since(data["pushed_at"])
@@ -594,9 +640,10 @@ def report_skill(sub: Submission, target: Target, ref: str, search: Search) -> N
         else f"the repository on `{ref}`"
     )
     if search.error:
-        sub.soft.append(
-            f"Could not list the repository tree at {where} ({search.error}); "
-            f"SKILL.md not verified."
+        sub.hard.append(
+            f"Could not list the repository tree at {where} ({search.error}), so "
+            f"the SKILL.md was not verified. A branch name with a slash reads as "
+            f"part of the folder: link a one-segment ref, or re-run the check."
         )
         return
     if not search.folder_found and not search.truncated:
@@ -609,9 +656,10 @@ def report_skill(sub: Submission, target: Target, ref: str, search: Search) -> N
     sub.facts["SKILL.md files"] = len(search.candidates)
     if search.skill is None:
         if not search.candidates and search.truncated:
-            sub.soft.append(
+            sub.hard.append(
                 "The repository tree is too large for one listing and no SKILL.md "
-                "was in the part GitHub returned. Confirm by hand."
+                "was in the part GitHub returned, so it was not verified. A "
+                f"maintainer checks it by hand and applies `{OVERRIDE_LABEL}`."
             )
         elif not search.candidates:
             sub.hard.append(
@@ -861,6 +909,7 @@ def main() -> int:
     subs = added_rows(args.base_ref)
     for s in subs:
         inspect(s)
+    subs += added_links(args.base_ref, subs)
 
     override = OVERRIDE_LABEL in {label.strip() for label in args.labels.split(",")}
     report, failing = render(subs, override)

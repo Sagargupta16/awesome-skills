@@ -56,14 +56,14 @@ def test_anchor_is_ignored():
 
 
 def test_accept_codes_come_from_lychee_config():
-    accept, _, _ = check_new_links.load_lychee_settings()
+    accept, *_ = check_new_links.load_lychee_settings()
 
     # 403 and 429 are bot-blocks and rate limits, not dead links.
     assert {200, 403, 429} <= accept
 
 
 def test_excluded_hosts_come_from_lychee_config():
-    _, excludes, _ = check_new_links.load_lychee_settings()
+    _, excludes, *_ = check_new_links.load_lychee_settings()
 
     assert any(p.search("https://x.com/someone") for p in excludes)
 

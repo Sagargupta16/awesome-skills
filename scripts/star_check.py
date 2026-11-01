@@ -219,39 +219,67 @@ def may_auto_merge(pr: dict) -> bool:
     return {f["filename"] for f in files} <= AUTO_MERGE_FILES
 
 
+def checked_head(pr: dict) -> dict | None:
+    """The pull request as it stands now, if it may merge unattended at that head.
+
+    The file list belongs to whatever the head is when it is read, so the head is
+    read before and after it. A push in between could carry a workflow change, so
+    that answers None too. Whatever the caller then does is pinned to this head.
+    """
+    number = pr["number"]
+    before, err = api("GET", f"repos/{REPO}/pulls/{seg(number)}")
+    sha = ((before or {}).get("head") or {}).get("sha")
+    if err or not sha or not may_auto_merge(before | {"number": number}):
+        return None
+    after, err = api("GET", f"repos/{REPO}/pulls/{seg(number)}")
+    if err or ((after or {}).get("head") or {}).get("sha") != sha:
+        print(f"  #{number}: head moved during the file check; left alone")
+        return None
+    return after
+
+
 # Merge states in which every required check has passed, so GitHub refuses to
 # switch auto-merge on and the pull request has to be merged directly.
 MERGEABLE_NOW = {"clean", "unstable", "has_hooks"}
 
 AUTO_MERGE_QUERY = (
-    "mutation($id: ID!) { enablePullRequestAutoMerge("
-    "input: {pullRequestId: $id, mergeMethod: SQUASH}) { clientMutationId } }"
+    "mutation($id: ID!, $head: GitObjectID!) { enablePullRequestAutoMerge("
+    "input: {pullRequestId: $id, mergeMethod: SQUASH, expectedHeadOid: $head})"
+    " { clientMutationId } }"
 )
 
 
 def release(pr: dict, dry_run: bool) -> None:
-    """Let a starrer's held pull request merge once its checks pass."""
+    """Let a starrer's held pull request merge once its checks pass.
+
+    The merge, or the auto-merge, is pinned to the head whose files were checked,
+    so GitHub refuses it if a push landed after the check.
+    """
     number = pr["number"]
-    if not may_auto_merge(pr):
-        print(f"  #{number}: stays with a maintainer (draft, files or labels)")
+    full = checked_head(pr)
+    if full is None:
+        print(f"  #{number}: stays with a maintainer (draft, files, labels or head)")
         return
+    sha = full["head"]["sha"]
     print(f"  #{number}: starred, so it merges once the checks pass")
     if dry_run:
         approve_held(pr, dry_run)
         return
-    full, err = api("GET", f"repos/{REPO}/pulls/{seg(number)}")
-    merge_now = not err and full.get("mergeable_state") in MERGEABLE_NOW
+    merge_now = full.get("mergeable_state") in MERGEABLE_NOW
     if merge_now:
         _, err = api(
             "PUT",
             f"repos/{REPO}/pulls/{seg(number)}/merge",
-            {"merge_method": "squash"},
+            {"merge_method": "squash", "sha": sha},
         )
     else:
         data, err = api(
             "POST",
             "graphql",
-            {"query": AUTO_MERGE_QUERY, "variables": {"id": pr["node_id"]}},
+            {
+                "query": AUTO_MERGE_QUERY,
+                "variables": {"id": pr["node_id"], "head": sha},
+            },
         )
         err = err or (data or {}).get("errors")
     if err:
@@ -269,19 +297,15 @@ def approve_held(pr: dict, dry_run: bool) -> None:
     starred pull request in the sister list sat 7h20m until a maintainer
     clicked. Only one that may merge unattended gets this: it touches list
     content alone, so the
-    held runs execute main's workflows and scripts against its README. The head
-    is read before and after the file check and only runs for that exact commit
-    are approved, so a push in between cannot slip a workflow change in.
+    held runs execute main's workflows and scripts against its README. Only runs
+    for the head checked_head() checked are approved, so a push in between
+    cannot slip a workflow change in.
     """
     number = pr["number"]
-    before, err = api("GET", f"repos/{REPO}/pulls/{seg(number)}")
-    sha = ((before or {}).get("head") or {}).get("sha")
-    if err or not sha or not may_auto_merge(before | {"number": number}):
+    full = checked_head(pr)
+    if full is None:
         return
-    after, err = api("GET", f"repos/{REPO}/pulls/{seg(number)}")
-    if err or ((after or {}).get("head") or {}).get("sha") != sha:
-        print(f"  #{number}: head moved during the file check; runs left held")
-        return
+    sha = full["head"]["sha"]
     runs, err = api(
         "GET",
         f"repos/{REPO}/actions/runs?head_sha={seg(sha)}&status=action_required",

@@ -22,7 +22,7 @@ Submitting your own work is welcome. Hiding that you did is not: undisclosed sel
 
 ## Quality standards
 
-Confirming these against [CONTRIBUTING.md](../CONTRIBUTING.md#quality-standards):
+Confirming these against [CONTRIBUTING.md](https://github.com/Sagargupta16/awesome-skills/blob/main/CONTRIBUTING.md#quality-standards):
 
 - [ ] The repository or folder holds a `SKILL.md` whose YAML frontmatter has a `name` and a `description`
 - [ ] It states an open-source licence: a `LICENSE` file, a package manifest field, or the `license` field of its `SKILL.md`

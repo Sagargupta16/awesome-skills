@@ -570,22 +570,21 @@ def test_a_folder_without_a_skill_md_is_blocked(monkeypatch):
     assert any("No SKILL.md under `docs`" in problem for problem in sub.hard)
 
 
-def test_an_unreadable_tree_is_left_for_a_maintainer(monkeypatch):
+def test_an_unreadable_tree_blocks_until_a_maintainer_looks(monkeypatch):
+    """A note never stops auto-merge, so an unverified SKILL.md must block."""
     api = FakeRepo(GOOD, ref="other")
     monkeypatch.setattr(check_submission, "gh_api", api)
     sub = check_submission.Submission("Alpha", "https://github.com/acme/alpha", "", "")
 
     check_submission.inspect(sub)
 
-    assert any("SKILL.md not verified" in note for note in sub.soft)
-    assert not any("SKILL.md" in problem for problem in sub.hard)
+    assert any("SKILL.md was not verified" in problem for problem in sub.hard)
 
 
-def test_a_non_github_url_is_left_for_a_maintainer(monkeypatch):
+def test_a_non_github_url_blocks_until_a_maintainer_looks(monkeypatch):
     sub = _inspected(GOOD, monkeypatch, url="https://acme.dev/skills/alpha")
 
-    assert sub.hard == []
-    assert any("Not a GitHub repository or folder URL" in n for n in sub.soft)
+    assert any("Not a GitHub repository or folder URL" in p for p in sub.hard)
 
 
 # --- the specification notes ---------------------------------------------------
@@ -864,6 +863,7 @@ def test_a_maintainer_note_does_not_fail_the_check(monkeypatch):
     (sub,) = _clean_subs("alpha")
     sub.soft.append("Confirm the licence by hand.")
     monkeypatch.setattr(check_submission, "added_rows", lambda base: [sub])
+    monkeypatch.setattr(check_submission, "added_links", lambda base, rows: [])
     monkeypatch.setattr(check_submission, "inspect", lambda sub: None)
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.setattr("sys.argv", ["check_submission.py"])

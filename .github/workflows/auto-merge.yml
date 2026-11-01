@@ -60,10 +60,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
           # optional: lets star_check.py read the stargazer list directly
           STARGAZERS_TOKEN: ${{ secrets.STARGAZERS_TOKEN }}
+          # who switched auto-merge on, read by disarm()
+          ARMED_BY_QUERY: >-
+            query($owner: String!, $name: String!, $pr: Int!) {
+            repository(owner: $owner, name: $name) { pullRequest(number: $pr) {
+            autoMergeRequest { enabledBy { login } } } } }
         run: |
           set -euo pipefail
 
@@ -76,20 +82,55 @@ jobs:
             esac
           }
 
-          blocked=""
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            if ! is_allowed "$f"; then
-              blocked="$blocked$f"$'\n'
+          # Every GitHub read below is its own assignment, never inside an `if` or
+          # `< <(...)`, so a failed call fails this step under `set -e` instead of
+          # reading as "not armed", "head moved" or "no files".
+
+          # Switch off an auto-merge this workflow armed once a later file change or
+          # stop label makes the pull request ineligible. Only the Actions bot's
+          # own: one a maintainer armed by hand is theirs to keep.
+          disarm() {
+            local armed_by
+            armed_by=$(gh api graphql -F owner="${REPO%/*}" -F name="${REPO#*/}" -F pr="$PR" \
+              -f query="$ARMED_BY_QUERY" \
+              --jq '.data.repository.pullRequest.autoMergeRequest.enabledBy.login // ""')
+            if [ "$armed_by" = github-actions ]; then
+              gh pr merge "$PR" --repo "$REPO" --disable-auto
+              echo "Auto merge was on and is now off." >> "$GITHUB_STEP_SUMMARY"
             fi
-          done < <(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          }
 
           {
             echo "## Auto merge"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # The file list belongs to whatever the head is when it is read, so it
+          # must be this event's head before and after the read. A push in between
+          # started a newer run, which decides instead.
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          if [ "$head" != "$HEAD_SHA" ]; then
+            echo "Not decided here: the head moved past $HEAD_SHA, and the newer run decides." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          blocked=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if ! is_allowed "$f"; then
+              blocked="$blocked$f"$'\n'
+            fi
+          done <<< "$files"
+
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          if [ "$head" != "$HEAD_SHA" ]; then
+            echo "Not decided here: the head moved while its files were read, and the newer run decides." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           if [ -n "$blocked" ]; then
+            disarm
             {
               echo "Not enabled. This pull request changes files outside the list itself:"
               echo
@@ -105,10 +146,12 @@ jobs:
 
           case ",$LABELS," in
             *,no-auto-merge,*)
+              disarm
               echo "Not enabled: the \`no-auto-merge\` label is set." >> "$GITHUB_STEP_SUMMARY"
               exit 0
               ;;
             *,maintainer-override,*)
+              disarm
               {
                 echo "Not enabled: the \`maintainer-override\` label is set."
                 echo
@@ -119,6 +162,8 @@ jobs:
               ;;
           esac
 
+          # No disarm here: issue-to-pr.yml and tidy.yml arm their own bot pull
+          # requests, whose author never stars, and GitHub has no unstar event.
           if ! python scripts/star_check.py --starred "$AUTHOR"; then
             {
               echo "Not enabled: @$AUTHOR has not starred the repository (\`missing-star\`)."
@@ -128,7 +173,8 @@ jobs:
             exit 0
           fi
 
-          gh pr merge "$PR" --repo "$REPO" --auto --squash
+          # pinned: GitHub refuses to arm it if the head is no longer the checked one
+          gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
 
           {
             echo "Enabled. @$AUTHOR has starred and this pull request only touches list"
