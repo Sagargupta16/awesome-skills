@@ -46,7 +46,7 @@ REPO_URL = f"https://github.com/{REPO}"
 
 # Mirrors auto-merge.yml: a pull request touching anything else is never merged
 # unattended, star or not, and neither is one a maintainer has stopped.
-AUTO_MERGE_FILES = {"README.md", "CHANGELOG.md"}
+AUTO_MERGE_FILES = {"README.md"}
 STOP_LABELS = {"no-auto-merge", "maintainer-override"}
 
 # The fallback reads newest stars first; past this many pages it gives up.

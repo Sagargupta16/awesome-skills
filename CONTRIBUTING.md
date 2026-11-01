@@ -40,9 +40,9 @@ Entries in the skill categories and in **Collections** are table rows in this ex
 
 You do not need to line up the pipes with the rows around yours. The tables are padded so the list passes [awesome-lint](https://github.com/sindresorhus/awesome-lint), and a bot re-pads them after new rows land. When a row wider than the rest widens its table, that re-padding can leave an open pull request in conflict with `main`; merging `main` into your branch, keeping `main`'s version of the table plus your row, and running `python scripts/validate.py --fix` clears it, or a maintainer can.
 
-- **Name** -- the skill or collection name, as a user would recognise it. Keep it short.
+- **Name** -- the skill or collection name, as a user would recognise it. Keep it short. Plain text: no links or HTML.
 - **URL** -- a direct `https://` link to the repository, or to the skill's folder inside one (`https://github.com/org/repo/tree/main/skills/foo`). Link the folder when the repository holds several skills and you are adding one of them. No tracking parameters, no redirect shorteners. The checks read GitHub, so a skill hosted anywhere else is held for a maintainer to check by hand.
-- **Description** -- what it does, in **80 characters or fewer**. Start with a capital letter. No trailing period. No em-dash or en-dash; write `--` or `-` instead. Describe the function, not the pitch: "Review pull requests for security and style issues" rather than "The ultimate AI code reviewer".
+- **Description** -- what it does, in **80 characters or fewer**. Start with a capital letter. No trailing period. Plain text: no links, URLs, email addresses, HTML or `|`. No em-dash or en-dash; write `--` or `-` instead. Describe the function, not the pitch: "Review pull requests for security and style issues" rather than "The ultimate AI code reviewer".
 - **Works with** -- the agents the skill supports, comma-separated, from exactly this list: `Claude Code`, `Codex`, `Cursor`, `Gemini CLI`, `Copilot`, or `Any`. Name an agent when the skill's README says it supports it or you have run it there. Use `Any` on its own, and only when the skill sticks to the open standard: plain `SKILL.md` frontmatter, and instructions and scripts that assume no one agent's tools, commands or plugin format.
 
 Example:
@@ -119,7 +119,7 @@ That is fine and normal -- much of this list exists because authors submitted th
 1. **Disclose it.** Tick the affiliation box in the pull request template. That is all: the disclosure is not held against you, it just means nobody has to guess. Self-promotion that was hidden and later discovered gets the entry removed, which is the only reason this matters.
 2. **Meet the same bar as everyone else.** A real `SKILL.md`, a licence, documentation, maintenance. Being the author neither helps nor hurts.
 
-Being new is not a reason to hold back. If you would rather not open a pull request, the [skill suggestion form](https://github.com/Sagargupta16/awesome-skills/issues/new?template=add-skill.yml) works just as well: for a skill or a collection, a bot turns the form into the same one-row pull request, runs the same checks, and merges it when they pass and you have starred the repository. If a field breaks a rule it comments on the issue, and editing the issue retries. The bullet sections are added by a maintainer, and a pull request that adds any link outside the skill tables is held for one.
+Being new is not a reason to hold back. If you would rather not open a pull request, the [skill suggestion form](https://github.com/Sagargupta16/awesome-skills/issues/new?template=add-skill.yml) works just as well: for a skill or a collection, a bot turns the form into the same one-row pull request, runs the same checks, and merges it when they pass and you have starred the repository. If a field breaks a rule it comments on the issue, and editing the issue retries. The bullet sections are added by a maintainer, and a pull request that changes `README.md` outside the skill table rows is held for one.
 
 ## Pull request process
 
@@ -129,17 +129,17 @@ Being new is not a reason to hold back. If you would rather not open a pull requ
 4. Make sure all checks pass:
    - **Validate format** -- structure, duplicates, description length, the Works with list
    - **Check links** -- every URL resolves
-   - **Check submitted entries** -- the `SKILL.md`, licence, maintenance and archived state; it holds any other new link (a bullet, a link in prose), or a row it cannot verify, for a maintainer
+   - **Check submitted entries** -- the `SKILL.md`, licence, maintenance and archived state; it holds any change to `README.md` outside the skill table rows (a bullet, prose, a heading, a link), or a row it cannot verify, for a maintainer
 
    On a pull request, **Validate format** only fails on problems your change
    introduces. If `main` already has a bad row, it is listed for the record but
    marked as pre-existing and does not count against you.
-5. **It merges itself once you have starred.** If your pull request only touches `README.md` or `CHANGELOG.md` and you have starred the repository, auto-merge is switched on for you: GitHub squash-merges it the moment every required check passes. No approval, no waiting for a maintainer to be awake. It will not merge while any required check is red, star or not.
+5. **It merges itself once you have starred.** If your pull request only touches `README.md` and you have starred the repository, auto-merge is switched on for you: GitHub squash-merges it the moment every required check passes. No approval, no waiting for a maintainer to be awake. It will not merge while any required check is red, star or not.
 
 A maintainer still reads what lands, and may follow up if a description reads promotionally or it is unclear what the skill does. Four things keep a pull request from merging itself:
 
-- **It touches anything beyond the list** -- a workflow, a script, a test, tooling config. Those change what the checks verify, so a person looks first.
-- **It adds a link outside the skill tables, or a row the checks cannot verify.** Only a table row is checked for a `SKILL.md`; the bullet sections hold vendor repositories, tools and articles, and a link outside GitHub has no `SKILL.md` the checks can read. **Check submitted entries** stays red until a maintainer reviews it, applies `maintainer-override` and merges it by hand.
+- **It touches anything beyond `README.md`** -- `CHANGELOG.md`, a workflow, a script, a test, tooling config. Those are the maintainer's, or change what the checks verify, so a person looks first.
+- **It changes `README.md` outside the skill table rows, or adds a row the checks cannot verify.** Only a table row is checked for a `SKILL.md`; the bullet sections hold vendor repositories, tools and articles, prose and headings are the list's own, and a link outside GitHub has no `SKILL.md` the checks can read. **Check submitted entries** stays red until a maintainer reviews it, applies `maintainer-override` and merges it by hand.
 - **You have not starred the repository.** A star is required before a pull request merges itself. Without one it waits, marked `missing-star`, and starring releases it: the label comes off and it merges once the checks pass. A maintainer can also merge it by hand. A star never gets an entry past a failing check.
 - **It carries the `maintainer-override` label**, which bypasses the submission gate. That is a maintainer's judgement call, so whoever applied it merges by hand.
 

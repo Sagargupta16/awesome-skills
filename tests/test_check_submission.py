@@ -863,7 +863,7 @@ def test_a_maintainer_note_does_not_fail_the_check(monkeypatch):
     (sub,) = _clean_subs("alpha")
     sub.soft.append("Confirm the licence by hand.")
     monkeypatch.setattr(check_submission, "added_rows", lambda base: [sub])
-    monkeypatch.setattr(check_submission, "added_links", lambda base, rows: [])
+    monkeypatch.setattr(check_submission, "changed_lines", lambda base: [])
     monkeypatch.setattr(check_submission, "inspect", lambda sub: None)
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.setattr("sys.argv", ["check_submission.py"])

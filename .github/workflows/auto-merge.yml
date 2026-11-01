@@ -73,11 +73,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Files a pull request may touch and still merge unattended. Content
-          # only: nothing here can change what the checks do.
+          # Files a pull request may touch and still merge unattended. The list
+          # only: nothing here can change what the checks do, and README.md is the
+          # one file the submission gate reads (CHANGELOG.md is the maintainer's).
           is_allowed() {
             case "$1" in
-              README.md|CHANGELOG.md) return 0 ;;
+              README.md) return 0 ;;
               *) return 1 ;;
             esac
           }

@@ -92,6 +92,11 @@ ROW_RE = re.compile(
 BULLET_RE = re.compile(r"^- \[(?P<name>[^\]]+)\]\((?P<url>[^)\s]+)\) - (?P<desc>.+)$")
 TOC_RE = re.compile(r"^\s*- \[(?P<label>[^\]]+)\]\(#(?P<anchor>[a-z0-9-]+)\)\s*$")
 
+# A URL, a markdown link, an HTML tag or an address GitHub autolinks. Names,
+# descriptions and Works with are plain text: a link inside a cell is not an
+# entry check_submission.py inspects, so it would merge with nothing looked at.
+LINKISH_RE = re.compile(r"://|\]\(|www\.|<[A-Za-z/!]|[\w.+-]@[\w-]+\.[A-Za-z]")
+
 # Re-exported so the pattern has one definition for all three gate scripts.
 REF_RE = gitref.REF_RE
 
@@ -104,6 +109,8 @@ class Entry:
     desc: str
     third: str
     section: str
+    # cells after Works with: GitHub renders them, the checks below read none
+    extra: str = ""
 
 
 @dataclass
@@ -181,6 +188,7 @@ def parse_entry(line: str, lineno: int, section: str):
             cells[0] if cells else "",
             cells[1] if len(cells) > 1 else "",
             section,
+            "|".join(cells[2:]).strip(),
         )
 
     bm = BULLET_RE.match(line)
@@ -388,6 +396,23 @@ def check_third_column(e: Entry, rep: Report) -> None:
 def check_entry(e: Entry, is_bullet: bool, rep: Report) -> None:
     if not e.url.startswith("https://"):
         rep.err(e.line, f"'{e.name}' URL must be https:// (got {e.url})")
+    for label, text in (
+        ("name", e.name),
+        ("description", e.desc),
+        ("Works with", e.third),
+    ):
+        if LINKISH_RE.search(text):
+            rep.err(
+                e.line,
+                f"'{e.name}' {label} holds a link or HTML; it must be plain text",
+            )
+    # A fourth cell, or an escaped `\|` that splits one, renders unread.
+    if e.extra:
+        rep.err(
+            e.line,
+            f"'{e.name}' row has cells after Works with; a row has exactly three, "
+            f"and a description cannot contain `|`",
+        )
     if not e.desc:
         rep.err(e.line, f"'{e.name}' has an empty description")
         return

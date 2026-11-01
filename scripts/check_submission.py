@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import difflib
 import http.client
 import json
 import os
@@ -37,7 +38,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-import check_new_links
 import gitref
 import validate
 
@@ -479,34 +479,66 @@ def added_rows(base_ref: str) -> list:
     return [sub for key, sub in after.items() if key not in before]
 
 
-def added_links(base_ref: str, rows: list) -> list:
-    """Links new to README.md that are not one of `rows`, each held for a maintainer.
+def _normal(line: str) -> str:
+    """A README line without its spacing or table padding, so re-padding, re-sorting
+    or trimming (what `validate.py --fix` does) never reads as a change."""
+    text = re.sub(r"\s*\|\s*", "|", " ".join(line.split()))
+    if text and set(text) <= set("|:-"):
+        text = re.sub(r"-+", "-", text)  # a separator row, whatever its width
+    return text
 
-    Only a skill table row is checked for a SKILL.md and a licence. Any other
-    new link, such as a bullet in Official or Tools (a vendor repository, a tool
-    or an article), a bullet with another list marker, a link in prose, or a row
-    the table parser cannot read, used to pass as "No new entries" and merge
-    itself, so CONTRIBUTING.md has a maintainer add those.
+
+def table_row_lines(lines: list) -> set:
+    """Line numbers of the rows in the skill and Collections tables."""
+    entries, _, _ = validate.parse(lines)
+    return {e.line for s in validate.TABLE_HEADERS for e in entries.get(s, [])}
+
+
+def outside_rows(lines: list) -> list:
+    """(line number, normalised text) for each non-blank line that is not a row."""
+    rows = table_row_lines(lines)
+    numbered = ((i, _normal(line)) for i, line in enumerate(lines, 1) if i not in rows)
+    return [(i, norm) for i, norm in numbered if norm]
+
+
+def changed_lines(base_ref: str) -> list:
+    """README lines added, removed or moved outside the skill tables, held.
+
+    Only a table row is checked: added_rows() inspects a new one, and validate.py
+    keeps its cells plain text. Everything else (a bullet in Official or Tools, a
+    bare URL, a reference link, HTML, a heading, prose) used to pass as "No new
+    entries" and merge itself, so CONTRIBUTING.md has a maintainer review it.
+    Those lines are compared in order, not as a set: a second copy of an existing
+    line, such as a code fence, changes how everything after it renders.
     """
     text = base_readme(base_ref)
     if text is None:
         return []
-    known = {validate.normalize_url(u) for u in check_new_links.links_in(text)}
-    known |= {validate.normalize_url(s.url) for s in rows}
-    head = check_new_links.links_in(Path("README.md").read_text(encoding="utf-8"))
-    held = []
-    for url in sorted(head):
-        if validate.normalize_url(url) in known:
+    base = text.splitlines(keepends=True)
+    head = Path("README.md").read_text(encoding="utf-8").splitlines(keepends=True)
+    before, after = outside_rows(base), outside_rows(head)
+    matcher = difflib.SequenceMatcher(
+        None, [t for _, t in before], [t for _, t in after], autojunk=False
+    )
+    held = Submission("README.md outside the skill tables", "", "", "")
+
+    def show(line: str) -> str:
+        return line.strip().replace("`", "'")[:100]
+
+    for tag, b1, b2, h1, h2 in matcher.get_opcodes():
+        if tag == "equal":
             continue
-        sub = Submission(url, url, "", "")
-        sub.hard.append(
-            "Adds a link outside the skill tables (a bullet, a link in prose, or a "
-            "row the table check cannot read), which the gate does not check for a "
-            f"SKILL.md or a licence. A maintainer reviews it and applies "
-            f"`{OVERRIDE_LABEL}` to merge it."
-        )
-        held.append(sub)
-    return held
+        for n, _ in before[b1:b2]:
+            held.hard.append(f"Removes base line {n}: `{show(base[n - 1])}`")
+        for n, _ in after[h1:h2]:
+            held.hard.append(f"Adds line {n}: `{show(head[n - 1])}`")
+    if not held.hard:
+        return []
+    held.hard.append(
+        "Only skill table rows are checked for a SKILL.md and a licence. A "
+        f"maintainer reviews the lines above and applies `{OVERRIDE_LABEL}` to merge."
+    )
+    return [held]
 
 
 def inspect(sub: Submission) -> None:
@@ -909,7 +941,7 @@ def main() -> int:
     subs = added_rows(args.base_ref)
     for s in subs:
         inspect(s)
-    subs += added_links(args.base_ref, subs)
+    subs += changed_lines(args.base_ref)
 
     override = OVERRIDE_LABEL in {label.strip() for label in args.labels.split(",")}
     report, failing = render(subs, override)
