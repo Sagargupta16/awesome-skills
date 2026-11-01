@@ -36,7 +36,7 @@ GITHUB_TOKEN=$(gh auth token) python scripts/build_site.py      # site into _sit
 python -m http.server 8766 --directory _site                   # preview it
 ```
 
-`.python-version` (3.15) is the interpreter every workflow installs via `python-version-file`.
+`.python-version` (3.14) is the interpreter every workflow installs via `python-version-file`. Keep it at the newest Python Dependabot supports: Dependabot reads it for the pip dependency graph, and on 3.15 (2026-11-01) every push that touched a requirements file failed with `tool_version_not_supported`. A Renovate or other bump past that support is a maintainer's call, not a merge.
 
 ## Test
 

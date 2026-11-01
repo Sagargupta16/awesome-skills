@@ -2,6 +2,12 @@
 
 Version headings below are documentation milestones. No git tag or GitHub release has been cut for any of them yet.
 
+## [0.3.1] - 2026-11-01
+
+### Fixed
+
+- `.python-version` is 3.14, was 3.15. Dependabot reads it for the pip dependency graph and supports up to 3.14, so the Dependency Graph job failed with `tool_version_not_supported` on every push that touched a requirements file, #2's lock-header change notwithstanding. CI now installs 3.14; the dev lock was already compiled for it, and its regeneration command in `requirements-dev.in` reads `.python-version` again and reproduces the lock unchanged.
+
 ## [0.3.0] - 2026-11-01
 
 Fixes from a whole-repository audit (2026-11-01). The first three closed ways for an entry to merge itself with nothing checked.
