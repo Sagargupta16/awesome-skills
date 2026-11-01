@@ -1,0 +1,137 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Daily rather than weekly, because the push-to-main run cannot be relied on.
+    # Auto-merge lands a pull request using GITHUB_TOKEN, and GitHub does not
+    # start a workflow run from a GITHUB_TOKEN push, so the full-file check on
+    # main is skipped for every auto-merged pull request. The pull request check
+    # is baseline-scoped by design and only sees problems that pull request
+    # introduces, so this schedule is what actually holds main to the whole bar.
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Read from .python-version so a local run and CI cannot drift onto
+      # different interpreters with nothing reconciling them.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      # On a pull request, fail only on problems the pull request introduces.
+      # A bad row merged to main used to break validation for every contributor
+      # who came after it, which is how one pull request in the sister list went
+      # red for another's mistake.
+      # Pre-existing problems are still listed, just not blamed on the author.
+      - name: Validate README structure
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          python scripts/validate.py --baseline "origin/${{ github.base_ref }}"
+
+      # Everywhere else, hold the whole file to the bar so pre-existing breakage
+      # stays visible on main rather than becoming permanently tolerated.
+      - name: Validate README structure (full)
+        if: github.event_name != 'pull_request'
+        run: python scripts/validate.py
+
+  python-checks:
+    name: Lint and test the gate scripts
+    runs-on: ubuntu-latest
+    # The submission gate is Python now, so it needs a gate of its own: a
+    # regression in validate.py or check_submission.py silently weakens every
+    # pull-request check while the list itself stays green.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      # Hash-locked rather than resolved at install time: a ruff release must not
+      # flip `ruff format --check` on an unrelated pull request, and nothing should
+      # enter this job without a checksum. Regenerate with the command in
+      # requirements-dev.in.
+      #
+      # --only-binary :all: refuses source distributions, whose setup.py runs
+      # arbitrary code at install time. Every pin in the lock resolves to a wheel,
+      # so nothing is lost; if a future pin has no wheel this fails loudly rather
+      # than quietly executing a build script.
+      - name: Install tooling
+        run: |
+          python -m pip install --require-hashes --only-binary :all: \
+            -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check scripts/ tests/
+
+      - name: Check formatting
+        run: ruff format --check scripts/ tests/
+
+      - name: Test
+        run: pytest tests/ -q
+
+  # The job name is a required status check on the `main` ruleset. Do not rename
+  # it without updating the ruleset in the same pass, or auto-merge waits forever
+  # on a check that never arrives under the old name.
+  link-check:
+    name: Check links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      # On a pull request, only the links the change introduces can fail it. A
+      # full sweep here charges the author for rot already on the base branch,
+      # which has blocked six innocent submissions across three rotted entries.
+      - name: Check new links
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          python scripts/check_new_links.py --base-ref "origin/${{ github.base_ref }}"
+
+      # The whole file is still swept on a pull request, for visibility, but it
+      # cannot fail the check. Pre-existing rot is the base branch's problem.
+      - name: Sweep every link (advisory on a pull request)
+        if: github.event_name == 'pull_request'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --config lychee.toml --verbose README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md
+          fail: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Everywhere else a dead link is a defect and fails the build, so rot on
+      # main stays loud. lychee.toml holds the retry and rate-limit settings that
+      # keep that from being flaky.
+      # Pinned to a commit rather than a moving tag: this is a third-party action
+      # and `v2` can be repointed at new code without the reference changing.
+      # Renovate bumps the SHA and the trailing comment together.
+      - name: Link Checker
+        if: github.event_name != 'pull_request'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --config lychee.toml --verbose README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

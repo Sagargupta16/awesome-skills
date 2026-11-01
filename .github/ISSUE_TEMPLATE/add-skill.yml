@@ -1,0 +1,127 @@
+name: Suggest a skill
+description: Suggest an Agent Skill, collection, tool, or resource for the list
+title: "Add: "
+labels: ["addition"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this if you would rather not open a pull request. For a skill or a
+        collection, a bot turns this form into the one-row pull request, runs the
+        same checks a contributor's pull request gets, and merges it when they pass
+        and you have starred the repository.
+        If a field breaks a rule it says why here, and editing the issue retries.
+        Official, Tools, Tutorials & Articles and Community entries are added by a
+        maintainer. Your project needs no minimum stars or age, so a brand-new one
+        is welcome here.
+
+        Please check [CONTRIBUTING.md](https://github.com/Sagargupta16/awesome-skills/blob/main/CONTRIBUTING.md#quality-standards) first.
+        Suggestions that clearly miss the bar get closed without much discussion.
+
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      placeholder: "PDF Tools"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Repository or folder URL
+      description: The repository, or the skill's folder inside one when the repository holds several skills.
+      placeholder: "https://github.com/org/repo/tree/main/skills/pdf"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: A skill category for one skill, Collections for a pack or plugin marketplace, or a bullet section, which a maintainer adds.
+      options:
+        - Development
+        - Testing & QA
+        - DevOps & Cloud
+        - Data & Databases
+        - Documents & Office
+        - Design & Frontend
+        - Security
+        - Writing & Content
+        - Research & Knowledge
+        - Productivity
+        - Skill Authoring
+        - Collections
+        - Official
+        - Tools
+        - Tutorials & Articles
+        - Community
+    validations:
+      required: true
+
+  - type: dropdown
+    id: works-with
+    attributes:
+      label: Works with
+      description: >
+        The agents its README says it supports, or that you ran it in. Pick Any on
+        its own, and only when the skill sticks to the open standard with no
+        agent-specific parts.
+      multiple: true
+      options:
+        - Claude Code
+        - Codex
+        - Cursor
+        - Gemini CLI
+        - Copilot
+        - Any
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What it does, in 80 characters or fewer. State the function, not the pitch.
+      placeholder: "Extract text and tables from PDFs, fill forms and merge files"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affiliation
+    attributes:
+      label: Affiliation
+      description: Suggesting your own project is welcome. Not saying so is not.
+      options:
+        - I am not connected to this project
+        - I am the author or maintainer
+        - I work for the company behind it
+        - Other connection (explain below)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: standards
+    attributes:
+      label: Quality standards
+      options:
+        - label: The repository or folder holds a SKILL.md whose YAML frontmatter has a name and a description
+          required: true
+        - label: It states an open-source licence, in a LICENSE file, a package manifest, or the license field of its SKILL.md
+          required: true
+        - label: Its README says how to install or use the skill
+          required: true
+        - label: It was pushed within the last 180 days and is not archived
+          required: true
+        - label: It is not already on the list, and it is not a fork
+          required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: >
+        Optional. Anything that helps, such as what makes it different from a similar
+        skill already listed. Your project needs no minimum stars or age, so a new or small
+        project does not need justifying.

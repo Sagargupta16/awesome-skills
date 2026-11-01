@@ -1,0 +1,187 @@
+name: Issue to pull request
+
+# Turns a "Suggest a skill" form into the pull request a contributor would have
+# opened, so a submission without git merges itself on the same checks.
+#
+# Three GitHub rules shape this workflow:
+#
+# 1. A pull request opened with GITHUB_TOKEN gets its `pull_request` runs created
+#    as action_required, and auto-merge waits until a maintainer approves them
+#    (in the sister list, form pull requests merged minutes after that approval,
+#    not before). This
+#    workflow also dispatches lint.yml and submission-check.yml on the submission
+#    branch: their check runs land on the branch head commit, which is the pull
+#    request's head, so the results are there to read before approving.
+#    GitGuardian is an app, not a workflow, and runs on its own.
+# 2. For the same reason auto-merge.yml never sees these pull requests, so this
+#    workflow switches auto-merge on itself, under the same rule: only when the
+#    submitter has starred the repository. Otherwise the pull request gets
+#    `missing-star` here, since star-check.yml skips the bot that opens it.
+# 3. The issue body is untrusted. It is read from the event payload file by
+#    scripts/issue_to_pr.py and never interpolated into a command; the only value
+#    that comes back (the entry name) is passed through the environment.
+#
+# Needs the repository setting "Allow GitHub Actions to create and approve pull
+# requests". There are no required reviews, so only the "create" half is used.
+# Not `labeled`: a form issue arrives with its label, which fires `opened` and
+# `labeled` together and ran this twice in the sister list (two identical
+# comments on one issue). To retry
+# an older issue, edit it.
+#
+# The sweep (after the runs that precede a merge, and on the schedule as a
+# fallback) closes the issue once its pull request has merged. "Closes #N"
+# does not fire here: GitHub skips closing keywords when the merge is made by
+# auto-merge on GITHUB_TOKEN (a form issue stayed open after its pull request
+# merged in the sister list).
+on:
+  issues:
+    types: [opened, edited]
+  # An auto-merge made with GITHUB_TOKEN starts no workflow, so the merge itself
+  # cannot trigger this. The runs that come just before a merge can: the last
+  # required check finishing, or Auto merge / Star check merging in the run. The
+  # schedule stays as a fallback; GitHub ran the "hourly" one every 3 to 6 hours.
+  workflow_run:
+    workflows: [Lint, Submission check, Auto merge, Star check]
+    types: [completed]
+  schedule:
+    - cron: "47 * * * *" # hourly
+  workflow_dispatch:
+
+# nothing by default; each job asks for exactly what it writes
+permissions: {}
+
+concurrency:
+  group: issue-to-pr-${{ github.event.issue.number || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  close-merged:
+    name: Close issues whose submission merged
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      # a merge started by the run that just finished can take a few seconds
+      - name: Let a pending merge land
+        if: github.event_name == 'workflow_run'
+        run: sleep 30
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      # The thank-you text, badge and star ask come from scripts/thank_contributors.py,
+      # the same source thanks.yml uses for contributor pull requests.
+      - name: Close each open form issue with a merged pull request
+        run: |
+          for n in $(gh issue list -R "$REPO" --label addition --state open --limit 200 --json number --jq '.[].number'); do
+            # owner-qualified: `gh pr list --head` would also match a fork's branch
+            pr=$(gh api "repos/$REPO/pulls?state=closed&head=$GITHUB_REPOSITORY_OWNER:submission/issue-$n" \
+              --jq '[.[] | select(.merged_at)][0].number // empty')
+            if [ -n "$pr" ]; then
+              if python scripts/thank_contributors.py --issue "$n" --pr "$pr" > thanks.md; then
+                gh issue comment "$n" -R "$REPO" --body-file thanks.md
+              else
+                gh issue comment "$n" -R "$REPO" --body "Merged in #$pr, so it is on the list and at https://sagargupta.online/awesome-skills/ now. Thanks!"
+              fi
+              gh issue close "$n" -R "$REPO" --reason completed
+              echo "closed #$n (merged in #$pr)"
+            fi
+          done
+
+  submit:
+    name: Open the pull request
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'addition')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the submission branch
+      pull-requests: write # open it and switch on auto-merge
+      issues: write # comment on the issue
+      actions: write # dispatch lint.yml and submission-check.yml
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: submission/issue-${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      - name: Build the row from the form
+        id: row
+        run: python scripts/issue_to_pr.py
+
+      - name: Explain why it was not added
+        if: steps.row.outputs.status != 'ok'
+        run: gh issue comment "$ISSUE" --body-file issue-comment.md
+
+      - name: Push the submission branch
+        if: steps.row.outputs.status == 'ok'
+        env:
+          NAME: ${{ steps.row.outputs.name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add README.md
+          git commit -m "Add $NAME" -m "Submitted in #$ISSUE."
+          # the branch belongs to this workflow; an edited issue replaces its commit
+          git push --force origin "$BRANCH"
+
+      - name: Open the pull request and start its checks
+        if: steps.row.outputs.status == 'ok'
+        env:
+          NAME: ${{ steps.row.outputs.name }}
+          SECTION: ${{ steps.row.outputs.section }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STARGAZERS_TOKEN: ${{ secrets.STARGAZERS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Same decision auto-merge.yml makes: a star is required before a
+          # pull request merges itself.
+          if python scripts/star_check.py --starred "$AUTHOR"; then
+            held=""
+            merges="You have starred the repository, so it merges itself once the required checks pass"
+          else
+            held="yes"
+            merges="It merges itself once you star the repository (then edit this issue to retry) and the checks pass, or when a maintainer merges it"
+          fi
+          # Owner-qualified: `gh pr list --head` matches the branch name alone, so
+          # a fork's pull request from submission/issue-N would match, and this
+          # would arm auto-merge on it.
+          submission_pr() {
+            gh api "repos/$REPO/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
+              --jq '.[0].number // empty'
+          }
+          pr=$(submission_pr)
+          if [ -z "$pr" ]; then
+            printf 'Adds **%s** to %s, from the form in #%s by @%s.\n\nCloses #%s\n\nOpened by the issue-to-pr workflow. %s.\n' \
+              "$NAME" "$SECTION" "$ISSUE" "$AUTHOR" "$ISSUE" "$merges" > pr-body.md
+            gh pr create --base main --head "$BRANCH" --title "Add $NAME" --body-file pr-body.md
+            pr=$(submission_pr)
+            gh issue comment "$ISSUE" --body "Thanks! Opened #$pr with this entry. $merges, and it shows up on https://sagargupta.online/awesome-skills/ within the hour of merging."
+          fi
+          gh workflow run lint.yml --ref "$BRANCH"
+          gh workflow run submission-check.yml --ref "$BRANCH"
+          if [ -n "$held" ]; then
+            gh api -X POST "repos/$REPO/issues/$pr/labels" -f "labels[]=missing-star" > /dev/null
+          else
+            # an edit after starring releases a pull request held on the first try
+            gh api -X DELETE "repos/$REPO/issues/$pr/labels/missing-star" > /dev/null 2>&1 || true
+            gh pr merge "$pr" --auto --squash
+          fi

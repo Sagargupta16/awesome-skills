@@ -1,0 +1,26 @@
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Added for consistency
+.env
+.env.local
+.env.*.local
+*.log
+
+# The website build output (scripts/build_site.py); the Pages workflow deploys it
+_site/
+
+# Python, for the scripts in scripts/ and the suite in tests/
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Local scratch output (sample READMEs, site previews)
+.scratch/

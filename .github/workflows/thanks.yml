@@ -1,0 +1,69 @@
+name: Thank contributors
+
+# Posts one thank-you on a contributor's pull request after its entry merges,
+# with the "Listed in" badge for their README and a star ask that says plainly it
+# is optional. Nothing is ever conditioned on a star: the ask comes after the
+# merge. Form submissions are thanked on their issue by issue-to-pr.yml instead,
+# with the same text.
+#
+# Hourly as well as on `closed`: auto-merge lands contributor pull requests using
+# GITHUB_TOKEN, and a merge made that way starts no workflow run, so `closed`
+# never fires for exactly the pull requests this is for. The event still catches
+# a maintainer's manual merge straight away. A hidden marker in the comment keeps
+# the two paths from posting twice.
+#
+# pull_request_target runs this file from main and checks out main, so nothing
+# from the pull request executes. The script reads the pull request over the API.
+# Not a required check.
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  # An auto-merge made with GITHUB_TOKEN starts no workflow, so the merge itself
+  # cannot trigger this. The runs that come just before a merge can: the last
+  # required check finishing, or Auto merge / Star check merging in the run. The
+  # schedule stays as a fallback; GitHub ran the "hourly" one every 3 to 6 hours.
+  workflow_run:
+    workflows: [Lint, Submission check, Auto merge, Star check]
+    types: [completed]
+  schedule:
+    - cron: "27 * * * *" # hourly
+  workflow_dispatch:
+
+# nothing by default; the job asks for exactly what it writes
+permissions: {}
+
+concurrency:
+  group: thank-contributors
+  cancel-in-progress: false
+
+jobs:
+  thank:
+    name: Thank merged contributors
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # comment on the merged pull request
+    steps:
+      # a merge started by the run that just finished can take a few seconds
+      - name: Let a pending merge land
+        if: github.event_name == 'workflow_run'
+        run: sleep 30
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      - name: Thank the contributor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -n "$PR" ]; then
+            python scripts/thank_contributors.py --pr "$PR"
+          else
+            python scripts/thank_contributors.py
+          fi

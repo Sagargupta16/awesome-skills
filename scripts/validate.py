@@ -1,0 +1,833 @@
+#!/usr/bin/env python3
+"""Structural validator for README.md.
+
+Enforces every rule CONTRIBUTING.md promises, so a pull request cannot merge
+while it breaks the list's format. Run with no arguments to check, or with
+--fix to auto-repair the mechanical problems (ordering, table alignment,
+whitespace, dashes).
+
+    python scripts/validate.py
+    python scripts/validate.py --fix
+
+Exit code 0 = clean, 1 = at least one error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import gitref
+
+README = Path(__file__).resolve().parent.parent / "README.md"
+
+# Canonical skill categories, in the order they must appear in README.md.
+# Adding a category here is deliberate: CONTRIBUTING.md requires an issue
+# discussion first, so this list is the enforcement point for that rule.
+SKILL_CATEGORIES = [
+    "Development",
+    "Testing & QA",
+    "DevOps & Cloud",
+    "Data & Databases",
+    "Documents & Office",
+    "Design & Frontend",
+    "Security",
+    "Writing & Content",
+    "Research & Knowledge",
+    "Productivity",
+    "Skill Authoring",
+]
+
+TOP_SECTIONS = [
+    "Official",
+    "Skills",
+    "Collections",
+    "Tools",
+    "Tutorials & Articles",
+    "Community",
+]
+
+# Prose sections that hold no entries. They sit outside the canonical top-level
+# order and are not listed in the table of contents.
+PROSE_SECTIONS = (
+    "Contents",
+    "Using a skill safely",
+    "Contributing",
+    "License",
+    "Footnotes",
+)
+
+# Sections the entry checks skip: the prose sections above, plus "Skills",
+# which is only a container for the category headings beneath it.
+NON_ENTRY_SECTIONS = PROSE_SECTIONS + ("Skills",)
+
+# Sections whose body is a markdown table, and the header row each must use.
+TABLE_HEADERS = {
+    "Collections": ["Collection", "Description", "Works with"],
+    **{c: ["Skill", "Description", "Works with"] for c in SKILL_CATEGORIES},
+}
+
+# Sections whose body is a bullet list.
+BULLET_SECTIONS = ["Official", "Tools", "Tutorials & Articles", "Community"]
+
+# The agents a table row's "Works with" cell may name, in the order the
+# issue form lists them. `Any` means the skill sticks to the open standard
+# (agentskills.io) and has no agent-specific parts, so it stands alone.
+WORKS_WITH = ["Claude Code", "Codex", "Cursor", "Gemini CLI", "Copilot", "Any"]
+ANY = "Any"
+
+# Table rows are scanned, so they stay terse. Bullet sections are prose and
+# get more room.
+MAX_DESC = 80
+MAX_BULLET_DESC = 160
+DASHES = {chr(0x2014): "em-dash", chr(0x2013): "en-dash"}
+
+ROW_RE = re.compile(
+    r"^\|\s*\[(?P<name>[^\]]+)\]\((?P<url>[^)\s]+)\)\s*\|(?P<rest>.*)\|\s*$"
+)
+BULLET_RE = re.compile(r"^- \[(?P<name>[^\]]+)\]\((?P<url>[^)\s]+)\) - (?P<desc>.+)$")
+TOC_RE = re.compile(r"^\s*- \[(?P<label>[^\]]+)\]\(#(?P<anchor>[a-z0-9-]+)\)\s*$")
+
+# Re-exported so the pattern has one definition for all three gate scripts.
+REF_RE = gitref.REF_RE
+
+
+@dataclass
+class Entry:
+    line: int
+    name: str
+    url: str
+    desc: str
+    third: str
+    section: str
+
+
+@dataclass
+class Report:
+    errors: list = field(default_factory=list)
+    notes: list = field(default_factory=list)
+
+    def err(self, line, msg: str) -> None:
+        """A defect. Fails the build."""
+        self.errors.append(self._where(line, msg))
+
+    def note(self, line, msg: str) -> None:
+        """Worth tidying, but not worth failing a contributor's pull request."""
+        self.notes.append(self._where(line, msg))
+
+    @staticmethod
+    def _where(line, msg: str) -> str:
+        prefix = f"README.md:{line}" if line else "README.md"
+        return f"{prefix}: {msg}"
+
+
+def slugify(heading: str) -> str:
+    """GitHub's heading-anchor algorithm, for the subset of characters used here."""
+    s = heading.strip().lower()
+    s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
+    # One hyphen per whitespace character, not per run: "Data & Databases"
+    # loses the ampersand and becomes "data--databases".
+    return re.sub(r"\s", "-", s)
+
+
+def normalize_url(url: str) -> str:
+    return re.sub(r"^https?://(www\.)?", "", url.rstrip("/")).lower()
+
+
+def sort_key(name: str) -> str:
+    """Case-insensitive, leading-punctuation-insensitive name ordering."""
+    return re.sub(r"^[^\w]+", "", name).casefold()
+
+
+def split_works_with(cell: str) -> list[str]:
+    """The agents a "Works with" cell names, as written."""
+    return [value.strip() for value in cell.split(",")]
+
+
+def works_with_problem(cell: str) -> str | None:
+    """Why a "Works with" cell breaks the vocabulary, or None when it is fine."""
+    values = split_works_with(cell)
+    if any(not value for value in values):
+        return "has an empty item; separate agents with ', '"
+    unknown = [value for value in values if value not in WORKS_WITH]
+    if unknown:
+        return f"names {unknown}, expected agents from {WORKS_WITH}"
+    if len(set(values)) != len(values):
+        return "names the same agent twice"
+    if ANY in values and len(values) > 1:
+        return f"combines '{ANY}' with named agents; '{ANY}' already means every agent"
+    return None
+
+
+# `\s(.*)` rather than `\s+(.*)`: `.` also matches whitespace, so the two
+# quantifiers overlap and the pattern backtracks super-linearly. One fixed
+# whitespace character plus a Python strip is equivalent and linear.
+HEADING_RE = re.compile(r"^(#{2,3})\s(.*)$")
+
+
+def parse_entry(line: str, lineno: int, section: str):
+    """Build an Entry from one table row or bullet, or None if the line is neither."""
+    rm = ROW_RE.match(line)
+    if rm:
+        cells = [c.strip() for c in rm.group("rest").split("|")]
+        return Entry(
+            lineno,
+            rm.group("name").strip(),
+            rm.group("url").strip(),
+            cells[0] if cells else "",
+            cells[1] if len(cells) > 1 else "",
+            section,
+        )
+
+    bm = BULLET_RE.match(line)
+    if bm and section in BULLET_SECTIONS:
+        return Entry(
+            lineno,
+            bm.group("name").strip(),
+            bm.group("url").strip(),
+            bm.group("desc").strip(),
+            "",
+            section,
+        )
+    return None
+
+
+def check_entry_syntax(lines, rep: Report) -> None:
+    """Flag lines that look like an entry but do not parse as one.
+
+    parse() ignores anything it cannot read, which is how a bullet once landed
+    inside a table-only section of the sister list: invisible to this validator
+    and to check_submission.py, so it auto-merged completely unvetted. Anything
+    shaped like an entry must therefore either parse or be reported.
+    """
+    section = None
+    in_fence = False
+    for i, raw in enumerate(lines, 1):
+        line = raw.rstrip("\n")
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
+        heading = HEADING_RE.match(line)
+        if heading:
+            section = heading.group(2).strip()
+            continue
+        if section is None or section in PROSE_SECTIONS:
+            continue
+
+        looks_like_entry = line.startswith("- [") or (
+            line.startswith("|") and "](" in line
+        )
+        if not looks_like_entry:
+            continue
+
+        if parse_entry(line, i, section) is None:
+            style = "a bullet list" if section in BULLET_SECTIONS else "a table"
+            rep.err(
+                i,
+                f"line looks like an entry but does not parse; '{section}' uses "
+                f"{style}. Anything unparseable is invisible to every other check, "
+                f"so it must be fixed rather than ignored",
+            )
+        elif line.startswith("|") and section in BULLET_SECTIONS:
+            rep.err(i, f"'{section}' is a bullet list, but this is a table row")
+
+
+def parse(lines):
+    """Return entries per section, heading line numbers, and heading order."""
+    entries = defaultdict(list)
+    heading_lines = {}
+    order = []
+    section = None
+
+    for i, raw in enumerate(lines, 1):
+        line = raw.rstrip("\n")
+        m = HEADING_RE.match(line)
+        if m:
+            section = m.group(2).strip()
+            heading_lines[section] = i
+            order.append(section)
+            entries.setdefault(section, [])
+            continue
+        if section is None:
+            continue
+
+        entry = parse_entry(line, i, section)
+        if entry is not None:
+            entries[section].append(entry)
+
+    return entries, heading_lines, order
+
+
+def check_structure(lines, order, heading_lines, rep: Report) -> None:
+    top = [h for h in order if lines[heading_lines[h] - 1].startswith("## ")]
+    top = [h for h in top if h not in PROSE_SECTIONS]
+    if top != TOP_SECTIONS:
+        rep.err(
+            None,
+            f"top-level sections {top} do not match the canonical order {TOP_SECTIONS}",
+        )
+
+    # a prose subsection, such as the safety guide under Footnotes, is not a category
+    subs = [
+        h
+        for h in order
+        if lines[heading_lines[h] - 1].startswith("### ") and h not in PROSE_SECTIONS
+    ]
+    if subs != SKILL_CATEGORIES:
+        extra = [c for c in subs if c not in SKILL_CATEGORIES]
+        missing = [c for c in SKILL_CATEGORIES if c not in subs]
+        if extra:
+            rep.err(
+                None,
+                f"unknown skill category {extra} -- new categories need an issue "
+                f"discussion first, then an entry in SKILL_CATEGORIES in scripts/validate.py",
+            )
+        if missing:
+            rep.err(None, f"skill category missing from README: {missing}")
+        if not extra and not missing:
+            rep.err(None, "skill categories are present but out of canonical order")
+
+
+def check_toc(lines, heading_lines, rep: Report) -> None:
+    try:
+        start = next(i for i, ln in enumerate(lines) if ln.startswith("## Contents"))
+        end = next(
+            i
+            for i, ln in enumerate(lines[start + 1 :], start + 1)
+            if ln.startswith("---")
+        )
+    except StopIteration:
+        rep.err(None, "could not locate the '## Contents' block")
+        return
+
+    anchors, labels = [], []
+    for i in range(start + 1, end):
+        m = TOC_RE.match(lines[i].rstrip("\n"))
+        if m:
+            anchors.append((i + 1, m.group("anchor")))
+            labels.append(m.group("label"))
+
+    valid = {slugify(h) for h in heading_lines}
+    for line_no, anchor in anchors:
+        if anchor not in valid:
+            rep.err(
+                line_no, f"table-of-contents anchor #{anchor} has no matching heading"
+            )
+
+    expected = ["Official", "Skills"] + SKILL_CATEGORIES + TOP_SECTIONS[2:]
+    if labels != expected:
+        rep.err(
+            start + 1,
+            "table of contents does not list every section in canonical order "
+            f"(expected {len(expected)} entries, found {len(labels)})",
+        )
+
+
+def check_table_headers(lines, heading_lines, rep: Report) -> None:
+    for section, cols in TABLE_HEADERS.items():
+        start = heading_lines.get(section)
+        if start is None:
+            continue
+        header = None
+        # Wide enough to skip an explanatory paragraph between heading and table.
+        for i in range(start, min(start + 15, len(lines))):
+            if lines[i].startswith("|"):
+                header = (
+                    i + 1,
+                    [c.strip() for c in lines[i].strip().strip("|").split("|")],
+                )
+                break
+        if header is None:
+            rep.err(start, f"section '{section}' has no table")
+            continue
+        line_no, got = header
+        if got != cols:
+            rep.err(line_no, f"section '{section}' header is {got}, expected {cols}")
+
+
+def check_empty_sections(entries, heading_lines, rep: Report) -> None:
+    """Note every entry section that has nothing in it yet.
+
+    The list launched with every section empty and the rows filled in after,
+    so an empty section is a note, not an error: the validator has to pass
+    while the list is being filled.
+    """
+    present = [s for s in [*BULLET_SECTIONS, *TABLE_HEADERS] if s in heading_lines]
+    for section in sorted(present, key=heading_lines.__getitem__):
+        if not entries.get(section):
+            rep.note(heading_lines[section], f"'{section}' has no entries yet")
+
+
+def check_description(e: Entry, is_bullet: bool, rep: Report) -> None:
+    """Length, capitalisation and terminal punctuation for one entry."""
+    cap = MAX_BULLET_DESC if is_bullet else MAX_DESC
+    if len(e.desc) > cap:
+        rep.err(e.line, f"'{e.name}' description is {len(e.desc)} chars, max {cap}")
+    if not (e.desc[0].isupper() or e.desc[0].isdigit()):
+        rep.err(e.line, f"'{e.name}' description must start with a capital letter")
+    if is_bullet and not e.desc.endswith("."):
+        rep.err(e.line, f"'{e.name}' bullet description must end with a period")
+    if not is_bullet and e.desc.endswith("."):
+        rep.err(e.line, f"'{e.name}' table description must not end with a period")
+
+
+def check_third_column(e: Entry, rep: Report) -> None:
+    """Every table names the agents its entry works with, from one vocabulary."""
+    problem = works_with_problem(e.third)
+    if problem:
+        rep.err(e.line, f"'{e.name}' Works with '{e.third}' {problem}")
+
+
+def check_entry(e: Entry, is_bullet: bool, rep: Report) -> None:
+    if not e.url.startswith("https://"):
+        rep.err(e.line, f"'{e.name}' URL must be https:// (got {e.url})")
+    if not e.desc:
+        rep.err(e.line, f"'{e.name}' has an empty description")
+        return
+    check_description(e, is_bullet, rep)
+    if not is_bullet:
+        check_third_column(e, rep)
+
+
+def check_entries(entries, rep: Report) -> None:
+    for section, rows in entries.items():
+        if section in NON_ENTRY_SECTIONS:
+            continue
+        is_bullet = section in BULLET_SECTIONS
+        for e in rows:
+            check_entry(e, is_bullet, rep)
+
+
+def check_duplicates(entries, rep: Report) -> None:
+    by_url = defaultdict(list)
+    by_name = defaultdict(list)
+    for section, rows in entries.items():
+        # Every entry appears exactly once across the whole list.
+        if section in NON_ENTRY_SECTIONS:
+            continue
+        for e in rows:
+            by_url[normalize_url(e.url)].append(e)
+            by_name[e.name.casefold()].append(e)
+
+    for url, es in by_url.items():
+        if len(es) > 1:
+            where = ", ".join(f"{e.section} L{e.line}" for e in es)
+            rep.err(es[0].line, f"duplicate URL {url} listed {len(es)} times ({where})")
+    for es in by_name.values():
+        if len(es) > 1:
+            where = ", ".join(f"{e.section} L{e.line}" for e in es)
+            rep.err(
+                es[0].line,
+                f"duplicate name '{es[0].name}' listed {len(es)} times ({where})",
+            )
+
+
+def check_alphabetical(entries, rep: Report) -> None:
+    """Report ordering as a note, not an error.
+
+    Where a row sits in its table is cosmetic: it changes nothing about whether
+    the skill is real, licensed or maintained. Failing a contributor's pull
+    request over it costs them a round trip to fix something `--fix` repairs in
+    a second, so this informs rather than blocks.
+    """
+    for section, rows in entries.items():
+        if section in TABLE_HEADERS and len(rows) > 1:
+            for prev, cur in zip(rows, rows[1:]):
+                if sort_key(cur.name) < sort_key(prev.name):
+                    rep.note(
+                        cur.line,
+                        f"'{cur.name}' is out of alphabetical order "
+                        f"(should come before '{prev.name}')",
+                    )
+
+
+def check_local_links(lines, heading_lines, rep: Report) -> None:
+    """Every non-http link must resolve: a real file, or a real heading anchor.
+
+    The link checker in CI treats a relative target as a filesystem path, so
+    GitHub's `../../issues/new/choose` form passes review and then fails the
+    build. Catch both cases here instead.
+    """
+    root = README.parent
+    anchors = {slugify(h) for h in heading_lines}
+    for i, line in prose_lines(lines):
+        # Inline code spans are illustrations too, as in `| [Name](URL) | ... |`.
+        stripped = re.sub(r"`[^`]*`", "", line)
+        for target in re.findall(r"\]\(([^)\s]+)\)", stripped):
+            check_link_target(target, i, root, anchors, rep)
+
+
+def prose_lines(lines):
+    """Yield (lineno, text) for lines outside fenced code blocks.
+
+    Fenced blocks hold format examples like `| [Name](URL) |`, which are
+    illustrations rather than links. The CI link checker skips them too.
+    """
+    in_fence = False
+    for i, raw in enumerate(lines, 1):
+        line = raw.rstrip("\n")
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            yield i, line
+
+
+def check_link_target(
+    target: str, lineno: int, root: Path, anchors, rep: Report
+) -> None:
+    if target.startswith(("http://", "https://", "mailto:")):
+        return
+    if target.startswith("#"):
+        if target[1:] not in anchors:
+            rep.err(lineno, f"link to #{target[1:]} has no matching heading")
+        return
+    if target.startswith(".."):
+        rep.err(
+            lineno,
+            f"relative link '{target}' escapes the repository; the link checker "
+            f"resolves it as a file path and fails. Use the full "
+            f"https://github.com/... URL instead",
+        )
+        return
+    path = target.partition("#")[0]
+    if path and not (root / path).exists():
+        rep.err(lineno, f"link target '{path}' does not exist")
+
+
+# The lines git writes around each side of an unresolved conflict.
+CONFLICT_MARKER_RE = re.compile(r"^(?:<<<<<<< .*|>>>>>>> .*|=======)$")
+
+
+def check_conflict_markers(lines, rep: Report) -> None:
+    """Flag the marker lines of a merge conflict nobody resolved.
+
+    A marker parses as nothing, so every other check reads straight past it: a
+    README with both sides of a conflict between a table header and its rows
+    passed as valid in the sister list. A marker inside a fenced block is an
+    illustration, so only prose lines count.
+    """
+    for i, line in prose_lines(lines):
+        if CONFLICT_MARKER_RE.match(line):
+            rep.err(
+                i,
+                "unresolved merge conflict marker; keep the side you want and "
+                "delete the marker lines",
+            )
+
+
+def check_whitespace_and_dashes(lines, rep: Report) -> None:
+    for i, raw in enumerate(lines, 1):
+        line = raw.rstrip("\n")
+        for ch, label in DASHES.items():
+            if ch in line:
+                rep.err(i, f"contains a {label}; use '--' or '-' instead")
+        if line != line.rstrip():
+            rep.err(i, "trailing whitespace")
+    if lines and not lines[-1].endswith("\n"):
+        rep.err(len(lines), "file must end with a newline")
+
+
+# A separator cell: dashes, optionally with alignment colons.
+SEPARATOR_CELL_RE = re.compile(r"^:?-+:?$")
+# A cell boundary. GFM reads `\|` as a literal pipe inside the cell.
+CELL_PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
+def _cells(line: str) -> list:
+    inner = line.strip().removeprefix("|")
+    if inner.endswith("|") and not inner.endswith("\\|"):
+        inner = inner[:-1]
+    return [c.strip() for c in CELL_PIPE_RE.split(inner)]
+
+
+def _width(text: str) -> int:
+    """Length in UTF-16 code units, which is what the lint rule counts."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _alignment(separator: str) -> str:
+    if separator.startswith(":") and separator.endswith(":"):
+        return "center"
+    return "right" if separator.endswith(":") else "left"
+
+
+def _pad(cell: str, width: int, align: str) -> str:
+    gap = width - _width(cell)
+    if align == "right":
+        return " " * gap + cell
+    if align == "center":
+        return " " * (gap // 2) + cell + " " * (gap - gap // 2)
+    return cell + " " * gap
+
+
+def _separator_cell(cell: str, width: int) -> str:
+    left = ":" if cell.startswith(":") else "-"
+    right = ":" if cell.endswith(":") else "-"
+    return left + "-" * (width - 2) + right
+
+
+def align_tables(lines):
+    """Pad every table cell so each column's pipes line up.
+
+    awesome-lint, which sindresorhus/awesome runs on every list it takes, rejects
+    a table whose pipes do not align or whose cells lack one space of padding.
+    Contributors write rows unpadded, so this is part of --fix rather than a rule
+    anyone has to follow by hand. Widths are UTF-16 code units, as the lint rule
+    measures them, and a column's separator colons set how its cells justify.
+    Lines inside fenced code blocks are examples, not tables, and stay as written.
+    """
+    out, i, in_fence = [], 0, False
+    while i < len(lines):
+        if lines[i].lstrip().startswith("```"):
+            in_fence = not in_fence
+        if in_fence or not lines[i].startswith("|"):
+            out.append(lines[i])
+            i += 1
+            continue
+        block = []
+        while i < len(lines) and lines[i].startswith("|"):
+            block.append(_cells(lines[i]))
+            i += 1
+        out.extend(_align_block(block))
+    return out
+
+
+def _align_block(block: list) -> list:
+    """Render one table, given as rows of cells, with its pipes lined up."""
+    is_separator = [all(SEPARATOR_CELL_RE.match(c) for c in row) for row in block]
+    widths = [3] * max(len(row) for row in block)
+    separators = [row for row, sep in zip(block, is_separator) if sep]
+    aligns = [_alignment(c) for c in separators[0]] if separators else []
+    aligns += ["left"] * (len(widths) - len(aligns))
+    for row in (r for r, sep in zip(block, is_separator) if not sep):
+        for col, cell in enumerate(row):
+            widths[col] = max(widths[col], _width(cell))
+    out = []
+    for row, sep in zip(block, is_separator):
+        if sep:
+            padded = [_separator_cell(c, widths[col]) for col, c in enumerate(row)]
+        else:
+            padded = [_pad(c, widths[col], aligns[col]) for col, c in enumerate(row)]
+        out.append("| " + " | ".join(padded) + " |\n")
+    return out
+
+
+def fix(lines):
+    """Repair the mechanical problems: ordering, alignment, whitespace, dashes."""
+    out = list(lines)
+    entries, _, _ = parse(out)
+
+    for section, rows in entries.items():
+        if section not in TABLE_HEADERS or len(rows) < 2:
+            continue
+        block = [out[e.line - 1] for e in rows]
+        ordered = [
+            b for _, b in sorted(zip(rows, block), key=lambda p: sort_key(p[0].name))
+        ]
+        for e, new in zip(rows, ordered):
+            out[e.line - 1] = new
+
+    out = [ln.rstrip() + "\n" for ln in out]
+    for ch in DASHES:
+        out = [ln.replace(ch, "--") for ln in out]
+    while len(out) > 1 and out[-1].strip() == "":
+        out.pop()
+    return align_tables(out)
+
+
+def run_checks(lines) -> tuple:
+    """Return (errors, entry_count, notes) for a README given as a list of lines."""
+    rep = Report()
+    entries, heading_lines, order = parse(lines)
+    check_conflict_markers(lines, rep)
+    check_structure(lines, order, heading_lines, rep)
+    check_toc(lines, heading_lines, rep)
+    check_table_headers(lines, heading_lines, rep)
+    check_empty_sections(entries, heading_lines, rep)
+    check_entry_syntax(lines, rep)
+    check_entries(entries, rep)
+    check_duplicates(entries, rep)
+    check_alphabetical(entries, rep)
+    check_local_links(lines, heading_lines, rep)
+    check_whitespace_and_dashes(lines, rep)
+
+    counted = {k: v for k, v in entries.items() if k not in NON_ENTRY_SECTIONS}
+    return rep.errors, sum(len(v) for v in counted.values()), rep.notes
+
+
+def problem_key(error: str) -> str:
+    """Identity of a problem, independent of where it sits in the file.
+
+    Adding a row shifts every line below it, so line numbers cannot be part of
+    the key: otherwise an untouched problem would look new to --baseline.
+    """
+    return re.sub(r"^README\.md:\d+:\s*", "", error)
+
+
+def baseline_errors(ref: str):
+    """Problems already present in README.md at `ref`, or None if unreadable.
+
+    `ref` reaches us from a command line, so it is checked against the shape of
+    a git ref before being handed to git. Nothing is run through a shell, but a
+    value beginning with `-` would still be read as an option rather than a
+    revision, so the leading character is constrained too.
+    """
+    if not gitref.is_valid_ref(ref):
+        print(
+            f"error: {ref!r} is not a valid git ref for --baseline",
+            file=sys.stderr,
+        )
+        return None
+
+    text, detail = gitref.show(ref, "README.md")
+    if text is None:
+        print(
+            f"warning: cannot read README.md at {ref} ({detail}); "
+            f"treating every problem as new",
+            file=sys.stderr,
+        )
+        return None
+
+    errors, _, _ = run_checks(text.splitlines(keepends=True))
+    return {problem_key(e) for e in errors}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--fix",
+        action="store_true",
+        help="auto-repair ordering, alignment, whitespace and dashes",
+    )
+    ap.add_argument(
+        "--baseline",
+        metavar="REF",
+        help="only fail on problems absent from README.md at REF, so a pull "
+        "request is not blamed for breakage already on the base branch",
+    )
+    args = ap.parse_args()
+
+    if not README.exists():
+        print(f"error: {README} not found", file=sys.stderr)
+        return 1
+
+    with README.open(encoding="utf-8", newline="") as fh:
+        lines = fh.readlines()
+
+    if args.fix:
+        lines = apply_fixes(lines)
+        if lines is None:
+            return 1
+
+    errors, total, notes = run_checks(lines)
+    inherited = split_inherited(errors, args.baseline)
+    new_errors = [e for e in errors if e not in inherited]
+
+    if errors:
+        print_problems(errors, inherited, total, args.baseline)
+
+    if notes:
+        print_notes(notes)
+
+    if new_errors:
+        return 1
+
+    print_success(total, inherited)
+    return 0
+
+
+def print_notes(notes) -> None:
+    """Advisory findings. Printed to stdout, and never part of the exit code."""
+    label = "note" if len(notes) == 1 else "notes"
+    print(f"{len(notes)} {label}, not blocking:\n")
+    for n in notes:
+        print(f"  {n}")
+    print("\nRun 'python scripts/validate.py --fix' to tidy what it can.\n")
+
+
+def apply_fixes(lines):
+    """Write the auto-repairable fixes back to README.md and return the result.
+
+    Returns None, writing nothing, when the file still holds conflict markers.
+    A marker cuts a table in two, so the sort would move rows across it and the
+    alignment would re-pad a header stranded above it as a one-row table.
+    """
+    conflicts = Report()
+    check_conflict_markers(lines, conflicts)
+    if conflicts.errors:
+        for e in conflicts.errors:
+            print(f"  {e}", file=sys.stderr)
+        print(
+            "\nREADME.md: not fixing a file with unresolved merge conflicts. "
+            "Resolve them, then run --fix again.",
+            file=sys.stderr,
+        )
+        return None
+
+    fixed = fix(lines)
+    if fixed == lines:
+        print("README.md: nothing to fix")
+        return lines
+    with README.open("w", encoding="utf-8", newline="") as fh:
+        fh.writelines(fixed)
+    print(
+        "README.md: applied automatic fixes (ordering, alignment, whitespace, dashes)"
+    )
+    return fixed
+
+
+def split_inherited(errors, baseline):
+    """Problems from `errors` that README.md at `baseline` already had."""
+    if not baseline or not errors:
+        return set()
+    known = baseline_errors(baseline)
+    if not known:
+        return set()
+    return {e for e in errors if problem_key(e) in known}
+
+
+def print_problems(errors, inherited, total: int, baseline) -> None:
+    print(f"{len(errors)} problem(s) found in {total} entries:\n", file=sys.stderr)
+    for e in errors:
+        tag = " (already on the base branch)" if e in inherited else ""
+        print(f"  {e}{tag}", file=sys.stderr)
+    if inherited:
+        print(
+            f"\n{len(inherited)} of these are already on `{baseline}` and are not this "
+            f"change's fault. They still need fixing, but they are not blocking here.",
+            file=sys.stderr,
+        )
+    print(
+        "\nRun 'python scripts/validate.py --fix' to repair ordering, alignment, "
+        "whitespace and dashes automatically. Everything else needs a human edit.",
+        file=sys.stderr,
+    )
+
+
+def print_success(total: int, inherited) -> None:
+    if inherited:
+        print(
+            f"This change introduces no new problems in {total} entries. "
+            f"{len(inherited)} pre-existing problem(s) remain, listed above."
+        )
+        return
+    # Ordering is deliberately not claimed here: it is a note now, not a check,
+    # so a clean run says nothing about whether the tables are sorted.
+    print(
+        f"README.md is valid: {total} entries across {len(SKILL_CATEGORIES)} skill "
+        f"categories, no duplicates."
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,30 @@
+# Link-checker configuration. The Lint workflow now FAILS on a broken link, so
+# this file exists to keep that signal trustworthy: retry transient errors,
+# accept rate limiting, and skip hosts that block automated requests outright.
+
+no_progress = true
+cache = true
+max_cache_age = "2d"
+
+timeout = 30
+max_retries = 3
+retry_wait_time = 5
+max_concurrency = 16
+
+# 429 means the host is rate limiting us, not that the link is dead.
+# 403 covers hosts that serve humans but reject automated requests.
+# 405 means the URL exists but refuses the method the checker sent, which is
+# not a dead link. Kept from the sister list, awesome-mcp-servers, where a live
+# endpoint answered a plain GET with 405 and a POST with 200.
+accept = [200, 206, 403, 405, 429]
+
+user_agent = "Mozilla/5.0 (compatible; awesome-skills link check; +https://github.com/Sagargupta16/awesome-skills)"
+
+# Hosts that hard-block automation regardless of user agent or backoff.
+# Keep this list as short as possible -- every entry is a link we stop checking.
+exclude = [
+  "^https://x\\.com",
+  "^https://twitter\\.com",
+  "^https://www\\.linkedin\\.com",
+  "^https://discord\\.gg",
+]

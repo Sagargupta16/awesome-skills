@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Agent Skills specification
+    url: https://agentskills.io/specification
+    about: The open standard for SKILL.md, its frontmatter fields and folder layout
+  - name: Report a malicious entry
+    url: https://github.com/Sagargupta16/awesome-skills/security/advisories/new
+    about: Private disclosure for a listed skill that behaves maliciously
+  - name: Propose a new category
+    url: https://github.com/Sagargupta16/awesome-skills/issues/new?labels=enhancement&title=New+category%3A+
+    about: Categories need discussion before a pull request, since CI rejects unknown headings

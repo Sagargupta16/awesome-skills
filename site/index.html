@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Awesome Agent Skills: {{SKILL_COUNT}} checked skills for coding agents</title>
+<meta name="description" content="A curated, CI-checked list of {{SKILL_COUNT}} Agent Skills across {{CATEGORY_COUNT}} categories, plus collections, tools and guides. Every entry holds a SKILL.md, is open source and actively maintained.">
+<meta name="theme-color" content="#0a0b0d">
+<meta property="og:title" content="Awesome Agent Skills">
+<meta property="og:description" content="{{SKILL_COUNT}} checked Agent Skills for Claude Code, Codex, Cursor, Gemini CLI and Copilot, searchable. Maintained, documented, verified by CI.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="./" aria-label="Awesome Agent Skills home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l4-4 4 4-4 4zM12 12l4-4 4 4-4 4z"/></svg>
+    <span>awesome-skills</span>
+  </a>
+  <nav class="bar-links">
+    <a class="ghost star" href="{{REPO_URL}}" target="_blank" rel="noopener" aria-label="Star awesome-skills on GitHub">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.9 4 4.4.5-3.3 3 .9 4.3L8 11.2 4.1 13.3 5 9 1.7 6l4.4-.5z"/></svg>
+      <span>Star<span class="wide"> on GitHub</span></span>
+    </a>
+    <a class="pill" href="{{SUBMIT_URL}}" target="_blank" rel="noopener">Add a skill</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">Agent Skills</p>
+    <h1>Agent Skills,<br>checked before they are listed.</h1>
+    <p class="lede">Every entry holds a SKILL.md an agent can load, states an open-source licence, was pushed to in the last 180 days, and documents how to install it, all verified by CI. Your project needs no minimum stars: new skills are welcome.</p>
+    <dl class="stats">
+      <div><dt>Skills</dt><dd>{{SKILL_COUNT}}</dd></div>
+      <div><dt>Categories</dt><dd>{{CATEGORY_COUNT}}</dd></div>
+      <div><dt>Collections</dt><dd>{{COLLECTION_COUNT}}</dd></div>
+      <div><dt>Updated</dt><dd><time datetime="{{UPDATED_ISO}}">{{UPDATED}}</time></dd></div>
+    </dl>
+  </section>
+
+  <section class="finder" aria-label="Browse the list">
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search {{TOTAL_COUNT}} entries: pdf, review, terraform..." autocomplete="off" aria-label="Search">
+      <kbd>/</kbd>
+    </div>
+    <div class="tabs" role="tablist">{{TABS}}</div>
+    <div class="cats" id="cats"><button class="cat" data-cat="" aria-pressed="true">All categories</button>{{CATEGORIES}}</div>
+    <div class="toolbar">
+      <p class="shown" id="shown" aria-live="polite"></p>
+      <label class="select">Works with
+        <select id="agent"><option value="">All agents</option>{{AGENT_OPTIONS}}</select>
+      </label>
+      <label class="select">Sort
+        <select id="sort">
+          <option value="stars">Most stars</option>
+          <option value="pushed">Recently updated</option>
+          <option value="name">Name</option>
+        </select>
+      </label>
+    </div>
+    <div class="grid" id="grid">
+{{CARDS}}
+    </div>
+    <div class="empty" id="empty" hidden>
+      <p>Nothing matches that yet.</p>
+      <a class="pill" href="{{SUBMIT_URL}}" target="_blank" rel="noopener">Suggest a skill</a>
+    </div>
+  </section>
+
+  <section class="submit">
+    <h2>Wrote a skill?</h2>
+    <p>Open a pull request that adds one row, or fill in the form. The checks verify the SKILL.md, the licence and recent activity, and once you have starred the repository a passing pull request merges itself. It shows up here within the hour.</p>
+    <div class="submit-links">
+      <a class="pill" href="{{SUBMIT_URL}}" target="_blank" rel="noopener">Submit with the form</a>
+      <a class="ghost" href="{{REPO_URL}}/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing guide</a>
+    </div>
+    <div class="listed">
+      <h3>Already listed? Show it.</h3>
+      <p>Paste this into your README. It links back here, so people who find your skill can find the rest of the list.</p>
+      <img src="badge.svg" alt="Listed in Awesome Agent Skills" width="174" height="20">
+      <pre class="snippet"><code>{{BADGE_MARKDOWN}}</code></pre>
+      <p class="aside">If the list is useful to you, a <a href="{{REPO_URL}}" target="_blank" rel="noopener">star on GitHub</a> helps other people find it, and it is what lets your pull request merge itself.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Built from <a href="{{REPO_URL}}/blob/main/README.md">README.md</a> on every change and every hour. Stars and dates from the GitHub API. <a href="skills.json">skills.json</a></p>
+  <p>CC0 1.0. Maintained by <a href="https://github.com/Sagargupta16">Sagar Gupta</a> and contributors. A place on this list is a filter, not a security audit: a skill can run scripts and shape what your agent does with your files, so read it before you install it.</p>
+</footer>
+<script src="app.js" defer></script>
+</body>
+</html>

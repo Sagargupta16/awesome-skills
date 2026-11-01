@@ -1,0 +1,57 @@
+name: Submission check
+
+# Looks up every entry a pull request adds and reports what a maintainer would
+# otherwise verify by hand: stars, licence, last push, archived state, repo age,
+# and whether the repository or folder holds a SKILL.md with a name and a
+# description.
+#
+# Runs on `pull_request` (not `pull_request_target`) so a fork's code never
+# executes with a writable token. The report goes to the job summary and the
+# check fails on a blocking problem.
+#
+# `labeled` and `unlabeled` are in the trigger list because the check honours the
+# maintainer-override label. Without them the job never re-runs after a label is
+# applied, so the documented escape hatch would only take effect on the next
+# push, which is not an escape hatch at all.
+
+# There is deliberately no `paths` filter. A required status check that is
+# path-filtered never reports on a pull request that misses the filter, and
+# auto-merge then waits on it forever. The job costs a few seconds when
+# README.md is untouched: check_submission.py finds no new entries and exits 0.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  # issue-to-pr.yml dispatches this on a submission branch: its pull request is
+  # opened with GITHUB_TOKEN, which starts no pull_request run. The check run lands
+  # on the branch head, the pull request's head, so it still satisfies the rule.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check submitted entries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+
+      - name: Inspect added entries
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          # a dispatched run has no pull request, and submissions always target main
+          BASE: ${{ github.event.pull_request.base.ref || 'main' }}
+        run: |
+          git fetch --no-tags origin "$BASE"
+          python scripts/check_submission.py \
+            --base-ref "origin/$BASE" \
+            --labels "$LABELS"
