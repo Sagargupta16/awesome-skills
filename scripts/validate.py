@@ -99,10 +99,23 @@ TOC_RE = re.compile(r"^\s*- \[(?P<label>[^\]]+)\]\(#(?P<anchor>[a-z0-9-]+)\)\s*$
 # check_submission.py inspects, so it would merge with nothing looked at.
 LINKISH_RE = re.compile(r"://|\]\(|www\.|[@\\<>]|&#?\w+;")
 
-# Characters with no place in the list: controls other than tab, and the line
+# A table row's URL as both the gate and GitHub read it. No parenthesis,
+# bracket, quote, backslash or space: one of those ends the link early, and the
+# rest of the cell renders as text that GitHub then autolinks.
+ROW_URL_RE = re.compile(r"^https://[A-Za-z0-9.-]+(?:[/?#][\w./~%+=&:@!,;*#?-]*)?$")
+
+# A row's name is link text: a bracket opens a nested link or image, and a pipe
+# ends the cell, hiding the description and Works with.
+NAME_MARKUP_RE = re.compile(r"[\[\]|]")
+
+# Characters with no place in the list: controls other than tab, non-ASCII and
+# zero-width spaces (GitHub trims only ASCII space and tab, so a no-break space
+# in a separator collapses its table), and the line
 # breaks Python's str.splitlines() honours but GitHub does not (U+0085, U+2028,
 # U+2029). Each one lets two readers of the same file see different lines.
-STRAY_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x85\u2028\u2029]")
+STRAY_CHAR_RE = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x85\u2028\u2029\xa0\u1680\u2000-\u200d\u202f\u205f\u2060\u3000\ufeff]"
+)
 
 # Re-exported so the pattern has one definition for all three gate scripts.
 REF_RE = gitref.REF_RE
@@ -431,6 +444,12 @@ def check_third_column(e: Entry, rep: Report) -> None:
 def check_entry(e: Entry, is_bullet: bool, rep: Report) -> None:
     if not e.url.startswith("https://"):
         rep.err(e.line, f"'{e.name}' URL must be https:// (got {e.url})")
+    elif not is_bullet and not ROW_URL_RE.match(e.url):
+        rep.err(
+            e.line,
+            f"'{e.name}' URL holds a character that can end a link early, such as "
+            f"a parenthesis, bracket, brace, quote, backslash or space",
+        )
     # Table rows only: a bullet is held for a maintainer by check_submission.py,
     # and a maintainer may write `<` or `@` in one.
     cells = (
@@ -449,6 +468,8 @@ def check_entry(e: Entry, is_bullet: bool, rep: Report) -> None:
                 f"'{e.name}' {label} holds a link or markup (a URL, `@`, a "
                 f"backslash, `<`, `>` or an HTML entity); it must be plain text",
             )
+    if not is_bullet and NAME_MARKUP_RE.search(e.name):
+        rep.err(e.line, f"'{e.name}' name cannot contain `[`, `]` or `|`")
     # A fourth cell, or an escaped `\|` that splits one, renders unread.
     if e.extra:
         rep.err(

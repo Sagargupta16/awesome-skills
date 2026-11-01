@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -29,7 +28,6 @@ ROOT = Path(__file__).resolve().parent.parent
 # Tutorials & Articles, Community) take prose a maintainer writes.
 AUTOMATED = [*validate.SKILL_CATEGORIES, "Collections"]
 NO_RESPONSE = "_No response_"
-URL_RE = re.compile(r"^https://[^\s()<>|\[\]]+$")
 
 
 class Rejected(ValueError):
@@ -68,9 +66,11 @@ def _clean_name(raw: str) -> str:
 
 def _clean_url(raw: str) -> str:
     url = raw.strip().rstrip("/")
-    if not URL_RE.match(url):
+    # validate.py's own row rule, so a form row never fails Validate format later
+    if not validate.ROW_URL_RE.match(url):
         raise Rejected(
-            "The URL must be one https:// link with no spaces, brackets or `|`."
+            "The URL must be one https:// link with no spaces, brackets, braces, "
+            "quotes, backslashes or `|`."
         )
     return url
 
