@@ -43,6 +43,7 @@ A skill can run scripts on your machine and shapes what your agent does with you
 Skill repositories maintained by the company behind the product or agent they cover, and the specification itself.
 
 - [Agent Skills specification](https://agentskills.io/specification) - The open format: SKILL.md rules, the clients that support it and guides for skill authors.
+- [Anthropic plugin directory](https://github.com/anthropics/claude-plugins-official) - Anthropic's curated Claude Code plugin marketplace, with first-party plugins and vetted partner plugins that can bundle skills.
 - [Anthropic skills](https://github.com/anthropics/skills) - Anthropic's public skills for documents, design, MCP and skill creation. Most are Apache-2.0; the four document skills are source-available.
 - [Cloudflare skills](https://github.com/cloudflare/skills) - Skills that teach agents to build on Cloudflare, with plugin installs for Claude Code, Codex and Cursor.
 - [GitHub awesome-copilot](https://github.com/github/awesome-copilot) - GitHub's community collection of skills, agents and instructions for Copilot.
@@ -50,10 +51,12 @@ Skill repositories maintained by the company behind the product or agent they co
 - [Google Stitch skills](https://github.com/google-labs-code/stitch-skills) - Skills that pair with the Stitch MCP server for design-to-code work.
 - [Hugging Face skills](https://github.com/huggingface/skills) - Skills for working with the Hugging Face ecosystem and its CLI.
 - [Microsoft skills](https://github.com/microsoft/skills) - Skills and agent guidance for Azure and Microsoft Foundry SDKs.
+- [NVIDIA skills](https://github.com/NVIDIA/skills) - NVIDIA-verified skills for CUDA-X, robotics, simulation and RAG, mirrored daily from NVIDIA's product repositories.
 - [OpenAI skills](https://github.com/openai/skills) - The Codex skills catalog, split into curated and system skills and licensed per skill.
 - [Sentry skills](https://github.com/getsentry/skills) - Skills the Sentry team uses for its own development, such as commits and settings audits.
 - [Stripe AI](https://github.com/stripe/ai) - Stripe's agent toolkit, which includes skills for building with Stripe.
 - [Supabase agent skills](https://github.com/supabase/agent-skills) - Skills that help agents build on Supabase.
+- [Vercel agent skills](https://github.com/vercel-labs/agent-skills) - Vercel's skills for React and Next.js performance, web design review, React Native, view transitions and Vercel deploys.
 
 ## Skills
 
@@ -61,20 +64,31 @@ One skill per row. **Works with** names the agents a skill supports; `Any` means
 
 ### Development
 
-| Skill                                                                  | Description                                                                     | Works with                                      |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
-| [Addy Osmani agent skills](https://github.com/addyosmani/agent-skills) | Production-minded engineering skills covering requirements, review and delivery | Any                                             |
-| [Anthony Fu skills](https://github.com/antfu/skills)                   | Anthony Fu's skills for Vue, Nuxt, Vite, Vitest, Pinia, UnoCSS and pnpm         | Any                                             |
-| [Expo skills](https://github.com/expo/skills)                          | Skills for building and shipping Expo apps and using Expo Application Services  | Claude Code, Codex, Cursor                      |
-| [Firebase agent skills](https://github.com/firebase/agent-skills)      | Firebase skills, shipped as a Gemini CLI extension and as plugins               | Claude Code, Codex, Gemini CLI                  |
-| [gstack](https://github.com/garrytan/gstack)                           | Role-based skill pack that turns Claude Code into a virtual engineering team    | Claude Code                                     |
-| [mattpocock/skills](https://github.com/mattpocock/skills)              | Engineering and productivity skills from Matt Pocock's own agents directory     | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
-| [Superpowers](https://github.com/obra/superpowers)                     | Software development methodology delivered as composable skills                 | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| Skill                                                                        | Description                                                                      | Works with                                      |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [Addy Osmani agent skills](https://github.com/addyosmani/agent-skills)       | Production-minded engineering skills covering requirements, review and delivery  | Any                                             |
+| [Android skills](https://github.com/android/skills)                          | Android development skills from Google, installed with the Android CLI           | Claude Code, Codex                              |
+| [Anthony Fu skills](https://github.com/antfu/skills)                         | Anthony Fu's skills for Vue, Nuxt, Vite, Vitest, Pinia, UnoCSS and pnpm          | Any                                             |
+| [Callstack Agent Skills](https://github.com/callstackincubator/agent-skills) | React Native skills for performance, navigation, upgrades, testing and migration | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model) | Draft design specs with one agent, then stress-test them with fresh reviewers    | Claude Code, Codex                              |
+| [Expo skills](https://github.com/expo/skills)                                | Skills for building and shipping Expo apps and using Expo Application Services   | Claude Code, Codex, Cursor                      |
+| [Firebase agent skills](https://github.com/firebase/agent-skills)            | Firebase skills, shipped as a Gemini CLI extension and as plugins                | Claude Code, Codex, Gemini CLI                  |
+| [Fullstack Dev Skills](https://github.com/Jeffallan/claude-skills)           | Full-stack developer skills covering languages, frameworks, testing and DevOps   | Claude Code                                     |
+| [Gemini API skills](https://github.com/google-gemini/gemini-skills)          | Skills for building apps with the Gemini API, Live API and Omni video models     | Claude Code, Codex, Cursor                      |
+| [gstack](https://github.com/garrytan/gstack)                                 | Role-based skill pack that turns Claude Code into a virtual engineering team     | Claude Code                                     |
+| [mattpocock/skills](https://github.com/mattpocock/skills)                    | Engineering and productivity skills from Matt Pocock's own agents directory      | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Ponytail](https://github.com/DietrichGebert/ponytail)                       | Makes agents write the least code that works, reusing what the repo already has  | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Superpowers](https://github.com/obra/superpowers)                           | Software development methodology delivered as composable skills                  | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [SwiftUI Expert Skill](https://github.com/AvdLee/SwiftUI-Agent-Skill)        | SwiftUI guidance on state, view composition, performance and Liquid Glass        | Any                                             |
+| [Understand Anything](https://github.com/Egonex-AI/Understand-Anything)      | Builds an explorable knowledge graph of a codebase or docs, with a dashboard     | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Waza](https://github.com/tw93/Waza)                                         | Eight engineering-habit skills for planning, review, debugging, UI and writing   | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [WordPress agent skills](https://github.com/WordPress/agent-skills)          | WordPress skills for blocks, themes, plugins, REST API, WP-CLI and performance   | Claude Code, Codex, Cursor, Copilot             |
 
 ### Testing & QA
 
 | Skill                                                                          | Description                                                                      | Works with           |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | -------------------- |
+| [Dev Browser](https://github.com/SawyerHood/dev-browser)                       | Browser automation CLI that lets agents drive Chrome with short scripts          | Claude Code, Codex   |
 | [Playwright CLI](https://github.com/microsoft/playwright-cli)                  | Playwright command line tool with a skill for browser automation and web testing | Claude Code, Copilot |
 | [Playwright Skill (lackeyjb)](https://github.com/lackeyjb/playwright-skill)    | Skill that has agents write and run Playwright scripts on the fly                | Any                  |
 | [Playwright Skill (TestDino)](https://github.com/testdino-hq/playwright-skill) | Playwright skill packs split into core, frontend, QA and CI topics               | Any                  |
@@ -100,69 +114,105 @@ One skill per row. **Works with** names the agents a skill supports; `Any` means
 
 ### Documents & Office
 
-| Skill                                                            | Description                                                               | Works with         |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------ |
-| [Google Workspace CLI](https://github.com/googleworkspace/cli)   | One CLI for Drive, Gmail, Calendar and Sheets, with a skill per service   | Gemini CLI         |
-| [guizang-ppt-skill](https://github.com/op7418/guizang-ppt-skill) | Skill for single-file HTML slide decks, covers and matching image prompts | Claude Code, Codex |
+| Skill                                                              | Description                                                                   | Works with                          |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------------------- |
+| [Frontend Slides](https://github.com/zarazhangrui/frontend-slides) | Build HTML slide decks from scratch or by converting PowerPoint files         | Claude Code, Codex, Gemini CLI      |
+| [Google Workspace CLI](https://github.com/googleworkspace/cli)     | One CLI for Drive, Gmail, Calendar and Sheets, with a skill per service       | Gemini CLI                          |
+| [guizang-ppt-skill](https://github.com/op7418/guizang-ppt-skill)   | Skill for single-file HTML slide decks, covers and matching image prompts     | Claude Code, Codex                  |
+| [Kami](https://github.com/tw93/Kami)                               | Layout rules and templates for agent-made PDF, PNG and PowerPoint documents   | Claude Code, Codex, Cursor          |
+| [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)                | Single-binary CLI that lets agents create and edit Word, Excel and PowerPoint | Claude Code, Codex, Cursor, Copilot |
+| [translate-book](https://github.com/deusyu/translate-book)         | Translate whole PDF, DOCX or EPUB books in parallel with subagents            | Claude Code, Codex                  |
 
 ### Design & Frontend
 
-| Skill                                                             | Description                                                                  | Works with                                      |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
-| [Archify](https://github.com/tt-a1i/archify)                      | Turns ideas, plans or codebases into interactive architecture diagrams       | Claude Code, Codex, Cursor                      |
-| [diagram-design](https://github.com/cathrynlavery/diagram-design) | Editorial diagram skill with 45 diagram types, output as HTML and SVG        | Claude Code, Codex, Cursor, Copilot             |
-| [Impeccable](https://github.com/pbakaus/impeccable)               | Design vocabulary and hooks that stop agents shipping generic AI-looking UI  | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
-| [orrery](https://github.com/Sagargupta16/orrery)                  | Animated cloud architecture diagrams from YAML with official vendor icons    | Claude Code, Codex, Cursor, Gemini CLI          |
-| [svg-forge](https://github.com/Sagargupta16/svg-forge)            | Skills for designing and auditing animated SVGs for READMEs and React scenes | Claude Code                                     |
-| [taste-skill](https://github.com/Leonxlnx/taste-skill)            | Art direction and browser checks so agents stop making generic AI pages      | Claude Code, Codex                              |
+| Skill                                                                         | Description                                                                   | Works with                                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| [App Store Screenshots](https://github.com/ParthJadhav/app-store-screenshots) | Scaffold a Next.js editor that exports App Store and Google Play screenshots  | Claude Code, Codex, Cursor                      |
+| [Archify](https://github.com/tt-a1i/archify)                                  | Turns ideas, plans or codebases into interactive architecture diagrams        | Claude Code, Codex, Cursor                      |
+| [diagram-design](https://github.com/cathrynlavery/diagram-design)             | Editorial diagram skill with 45 diagram types, output as HTML and SVG         | Claude Code, Codex, Cursor, Copilot             |
+| [drawio-skill](https://github.com/Agents365-ai/drawio-skill)                  | Editable draw.io diagrams from prompts, code, Terraform, SQL and OpenAPI      | Claude Code, Codex, Cursor, Copilot             |
+| [GSAP Skills](https://github.com/greensock/gsap-skills)                       | Official GSAP skills for the core API, timelines, ScrollTrigger and plugins   | Claude Code, Codex, Cursor, Copilot             |
+| [Huashu Design](https://github.com/alchaincyf/huashu-design)                  | HTML prototypes, slide decks, animation and infographics with a style library | Any                                             |
+| [HyperFrames](https://github.com/heygen-com/hyperframes)                      | Write HTML, CSS and seekable animations, then render deterministic MP4 video  | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Impeccable](https://github.com/pbakaus/impeccable)                           | Design vocabulary and hooks that stop agents shipping generic AI-looking UI   | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [Logo Design Skill](https://github.com/kaankiziltug/logo-design-skill)        | Logo design from brief to SVG, with a reference library of 1,400+ logos       | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [orrery](https://github.com/Sagargupta16/orrery)                              | Animated cloud architecture diagrams from YAML with official vendor icons     | Claude Code, Codex, Cursor, Gemini CLI          |
+| [svg-forge](https://github.com/Sagargupta16/svg-forge)                        | Skills for designing and auditing animated SVGs for READMEs and React scenes  | Claude Code                                     |
+| [taste-skill](https://github.com/Leonxlnx/taste-skill)                        | Art direction and browser checks so agents stop making generic AI pages       | Claude Code, Codex                              |
+| [Three.js Skills](https://github.com/CloudAI-X/threejs-skills)                | Guidance on three.js, React Three Fiber and WebGPU for 3D web apps            | Claude Code                                     |
+| [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)      | Searchable UI styles, color palettes and font pairings for UI and UX work     | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
 
 ### Security
 
-| Skill                                                                                 | Description                                                               | Works with         |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------ |
-| [Cloudflare security-audit skill](https://github.com/cloudflare/security-audit-skill) | Multi-phase security audit workflow with independently verified findings  | Any                |
-| [Trail of Bits skills](https://github.com/trailofbits/skills)                         | Security research, vulnerability detection and audit workflows as plugins | Claude Code, Codex |
+| Skill                                                                                 | Description                                                                     | Works with         |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------ |
+| [Cloudflare security-audit skill](https://github.com/cloudflare/security-audit-skill) | Multi-phase security audit workflow with independently verified findings        | Any                |
+| [ctf-skills](https://github.com/ljagiello/ctf-skills)                                 | CTF skills for web exploitation, pwn, crypto, reverse engineering and forensics | Any                |
+| [Trail of Bits skills](https://github.com/trailofbits/skills)                         | Security research, vulnerability detection and audit workflows as plugins       | Claude Code, Codex |
 
 ### Writing & Content
 
-| Skill                                                                | Description                                                              | Works with         |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------ |
-| [Humanizer](https://github.com/blader/humanizer)                     | Removes telltale signs of AI writing from text while keeping its meaning | Claude Code, Codex |
-| [Marketing Skills](https://github.com/coreyhaines31/marketingskills) | Marketing skills for CRO, copywriting, SEO, analytics and growth         | Any                |
+| Skill                                                                            | Description                                                                     | Works with                                      |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [Aaron Marketing Skills](https://github.com/aaron-he-zhu/aaron-marketing-skills) | 120 marketing skills across seven disciplines including SEO, GEO and content    | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)            | Audits and rewrites text to remove AI writing patterns, with voice profiles     | Claude Code, Codex                              |
+| [Baoyu Skills](https://github.com/JimLiu/baoyu-skills)                           | Skills for illustrations, covers, slide decks, translation and social posts     | Claude Code, Codex                              |
+| [Claude SEO](https://github.com/AgriciDaniel/claude-seo)                         | SEO audits covering technical SEO, Core Web Vitals, schema, local and AI search | Claude Code                                     |
+| [Humanizer](https://github.com/blader/humanizer)                                 | Removes telltale signs of AI writing from text while keeping its meaning        | Claude Code, Codex                              |
+| [LinkedIn Marketing Skills](https://github.com/sergebulaev/linkedin-skills)      | Write LinkedIn posts, comments and replies in your voice, with approval first   | Claude Code, Codex                              |
+| [Marketing Skills](https://github.com/coreyhaines31/marketingskills)             | Marketing skills for CRO, copywriting, SEO, analytics and growth                | Any                                             |
+| [Prompt Master](https://github.com/nidhinjs/prompt-master)                       | Writes tool-specific prompts for AI tools, from coding agents to image models   | Claude Code                                     |
+| [Resume Skills](https://github.com/Paramchoudhary/ResumeSkills)                  | Skills for resume optimization, job applications and career development         | Claude Code                                     |
 
 ### Research & Knowledge
 
-| Skill                                                                                                          | Description                                                                    | Works with                 |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------- |
-| [Agent Skills for Context Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering) | Context engineering and multi-agent design skills for production agent systems | Claude Code, Cursor        |
-| [last30days-skill](https://github.com/mvanhorn/last30days-skill)                                               | Researches a topic across Reddit, X, YouTube and the web into one summary      | Any                        |
-| [Obsidian skills](https://github.com/kepano/obsidian-skills)                                                   | Skills that teach agents the Obsidian CLI, Markdown, Bases and JSON Canvas     | Any                        |
-| [Scientific Agent Skills](https://github.com/K-Dense-AI/scientific-agent-skills)                               | Large science skill library for biology, chemistry, medicine and data analysis | Claude Code, Codex, Cursor |
+| Skill                                                                                                          | Description                                                                    | Works with                                      |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| [Agent Reach](https://github.com/Panniantong/Agent-Reach)                                                      | Read-only access to X, Reddit, YouTube, Bilibili and more for agents           | Any                                             |
+| [Agent Skills for Context Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering) | Context engineering and multi-agent design skills for production agent systems | Claude Code, Cursor                             |
+| [ARIS](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep)                                       | Autonomous ML research workflows from idea discovery to paper and review       | Claude Code, Codex, Cursor, Copilot             |
+| [claude-obsidian](https://github.com/AgriciDaniel/claude-obsidian)                                             | Files sources into a linked Obsidian wiki that the agent maintains and queries | Claude Code, Codex, Cursor, Gemini CLI          |
+| [Deep Research Skills](https://github.com/Weizhena/Deep-Research-skills)                                       | Two-phase deep research with an outline, parallel agents and a final report    | Claude Code, Codex                              |
+| [last30days-skill](https://github.com/mvanhorn/last30days-skill)                                               | Researches a topic across Reddit, X, YouTube and the web into one summary      | Any                                             |
+| [notebooklm-py](https://github.com/teng-lin/notebooklm-py)                                                     | Python API, CLI and skill for driving Google NotebookLM from agents            | Claude Code, Codex                              |
+| [Obsidian skills](https://github.com/kepano/obsidian-skills)                                                   | Skills that teach agents the Obsidian CLI, Markdown, Bases and JSON Canvas     | Any                                             |
+| [Scientific Agent Skills](https://github.com/K-Dense-AI/scientific-agent-skills)                               | Large science skill library for biology, chemistry, medicine and data analysis | Claude Code, Codex, Cursor                      |
+| [Social Media Research Skills](https://github.com/ScrapeCreators/social-media-research-skills)                 | Social media research workflows across TikTok, Instagram, YouTube and Reddit   | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
 
 ### Productivity
 
-| Skill                                                                   | Description                                                                | Works with         |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------ |
-| [Planning with Files](https://github.com/OthmanAdi/planning-with-files) | Persistent markdown plans that survive context resets in long agent tasks  | Any                |
-| [PM Skills](https://github.com/phuryn/pm-skills)                        | Product management skills from discovery and strategy to launch and growth | Claude Code, Codex |
+| Skill                                                                   | Description                                                                  | Works with                                      |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| [i-have-adhd](https://github.com/ayghri/i-have-adhd)                    | Makes agents lead with the answer in short, skimmable, ADHD-friendly replies | Claude Code, Codex, Cursor, Gemini CLI, Copilot |
+| [n8n-skills](https://github.com/czlonkowski/n8n-skills)                 | Skills for building n8n workflows with the n8n-mcp server                    | Claude Code                                     |
+| [Planning with Files](https://github.com/OthmanAdi/planning-with-files) | Persistent markdown plans that survive context resets in long agent tasks    | Any                                             |
+| [PM Skills](https://github.com/phuryn/pm-skills)                        | Product management skills from discovery and strategy to launch and growth   | Claude Code, Codex                              |
 
 ### Skill Authoring
 
-| Skill                                                                                            | Description                                                            | Works with  |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ----------- |
-| [book-to-skill](https://github.com/virgiliojr94/book-to-skill)                                   | Converts a technical book PDF or document folder into a reusable skill | Any         |
-| [skill-creator (Anthropic)](https://github.com/anthropics/skills/tree/main/skills/skill-creator) | Anthropic's skill for creating, editing and evaluating other skills    | Claude Code |
+| Skill                                                                                            | Description                                                               | Works with  |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ----------- |
+| [book-to-skill](https://github.com/virgiliojr94/book-to-skill)                                   | Converts a technical book PDF or document folder into a reusable skill    | Any         |
+| [skill-creator (Anthropic)](https://github.com/anthropics/skills/tree/main/skills/skill-creator) | Anthropic's skill for creating, editing and evaluating other skills       | Claude Code |
+| [task-observer](https://github.com/rebelytics/one-skill-to-rule-them-all)                        | Meta-skill that logs corrections and gaps and suggests skill improvements | Claude Code |
 
 ## Collections
 
 Multi-skill packs and plugin marketplaces, listed once as a whole.
 
-| Collection                                                                      | Description                                                              | Works with                             |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------- |
-| [Agentic Awesome Skills](https://github.com/sickn33/agentic-awesome-skills)     | Large installable library of SKILL.md playbooks with a catalog and CLI   | Claude Code, Codex, Cursor, Gemini CLI |
-| [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills) | Hundreds of skills and plugins across engineering, marketing and product | Claude Code, Codex, Cursor, Gemini CLI |
-| [ECC](https://github.com/affaan-m/ECC)                                          | Agent harness collection of skills, memory and security tooling          | Claude Code, Codex                     |
-| [wshobson/agents](https://github.com/wshobson/agents)                           | Plugin marketplace of agents, skills and commands for many coding tools  | Claude Code, Codex, Cursor, Copilot    |
+| Collection                                                                      | Description                                                                    | Works with                             |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------- |
+| [Agentic Awesome Skills](https://github.com/sickn33/agentic-awesome-skills)     | Large installable library of SKILL.md playbooks with a catalog and CLI         | Claude Code, Codex, Cursor, Gemini CLI |
+| [AI Research Skills](https://github.com/Orchestra-Research/AI-Research-SKILLs)  | Large library of skills for AI research, training, inference and paper writing | Claude Code, Codex, Cursor, Gemini CLI |
+| [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills) | Hundreds of skills and plugins across engineering, marketing and product       | Claude Code, Codex, Cursor, Gemini CLI |
+| [Build with Claude](https://github.com/davepoon/buildwithclaude)                | Plugin marketplace of Claude Code agents, commands, hooks and skills           | Claude Code                            |
+| [Claude Code Templates](https://github.com/davila7/claude-code-templates)       | Catalog and CLI for Claude Code agents, commands, hooks, MCPs and skills       | Claude Code                            |
+| [ECC](https://github.com/affaan-m/ECC)                                          | Agent harness collection of skills, memory and security tooling                | Claude Code, Codex                     |
+| [Garden Skills](https://github.com/ConardLi/garden-skills)                      | Six skills for code video, web design, image prompts, articles and retrieval   | Claude Code, Codex, Cursor, Gemini CLI |
+| [Khazix Skills](https://github.com/KKKKhazix/khazix-skills)                     | Six everyday skills for AI news, research analysis, writing and docs cleanup   | Claude Code, Codex, Cursor             |
+| [Tons of Skills](https://github.com/jeremylongshore/tons-of-skills-marketplace) | Plugin marketplace of 400+ plugins and skills with the ccpi installer CLI      | Claude Code                            |
+| [Wondelai skills](https://github.com/wondelai/skills)                           | Skills built on business, UX and coding books, plus guided journeys            | Claude Code, Codex, Cursor             |
+| [wshobson/agents](https://github.com/wshobson/agents)                           | Plugin marketplace of agents, skills and commands for many coding tools        | Claude Code, Codex, Cursor, Copilot    |
 
 ## Tools
 
@@ -176,6 +226,7 @@ Validators, linters, installers and registries for skills.
 - [skills.sh](https://skills.sh) - A directory for discovering and installing agent skills, tied to the skills CLI.
 - [SkillSpector](https://github.com/NVIDIA/SkillSpector) - NVIDIA's scanner that checks skills for prompt injection, exfiltration and risky patterns before install.
 - [Snyk Agent Scan](https://github.com/snyk/agent-scan) - Snyk's scanner for agent components, MCP servers and skills, looking for prompt injection and vulnerabilities.
+- [UI Skills](https://github.com/ibelick/ui-skills) - Registry, CLI and MCP server of UI skills for design engineers, plus its own baseline UI skills.
 
 ## Tutorials & Articles
 

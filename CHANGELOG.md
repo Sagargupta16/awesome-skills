@@ -2,6 +2,12 @@
 
 Version headings below are documentation milestones. No git tag or GitHub release has been cut for any of them yet.
 
+## [0.2.0] - 2026-11-01
+
+### Added
+
+- 51 entries, taking the list from 69 to 120: 10 in Development, 8 in Design & Frontend, 7 in Writing & Content, 6 in Research & Knowledge, 4 in Documents & Office, 2 in Productivity, 1 each in Testing & QA, Security and Skill Authoring, 7 Collections, 3 Official repositories (Anthropic's plugin directory, NVIDIA, Vercel) and 1 Tool. Candidates came from the repositories that the larger skill lists link to and from GitHub's `agent-skills`, `claude-skills` and `skills` topics, at 1,500 stars or more. Each table row passed `check_submission.py` with no blocking problem and no unreachable lookup; the four bullets, which the gate does not read, were checked by hand against the same bar. Repositories that only use skills for their own development were left out.
+
 ## [0.1.0] - 2026-11-01
 
 The list's scaffolding, ported from the sister list [awesome-mcp-servers](https://github.com/Sagargupta16/awesome-mcp-servers) (2.10.3) and adapted from MCP servers to [Agent Skills](https://agentskills.io/). Every section is in place with an empty table or no bullets, ready for the first entries.
