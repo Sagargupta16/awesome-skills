@@ -2,6 +2,28 @@
 
 Version headings below are documentation milestones. No git tag or GitHub release has been cut for any of them yet.
 
+## [0.3.0] - 2026-11-01
+
+Fixes from a whole-repository audit (2026-11-01). The first three closed ways for an entry to merge itself with nothing checked.
+
+### Changed
+
+- `check_submission.py` blocks what it cannot verify instead of noting it: a table row that links outside GitHub, a repository lookup that fails with anything but a 404 (a rate limit, a 5xx, a timeout), a tree it cannot list, and a truncated tree with no `SKILL.md` in it. A note never stopped auto-merge, so each of these merged with no `SKILL.md`, licence or activity check. A failed lookup clears on a re-run; the rest wait for a maintainer to check by hand and apply `maintainer-override`. CONTRIBUTING.md says so.
+- A pull request that adds or removes any `README.md` line outside the skill and Collections table rows is held for a maintainer: a bullet in Official, Tools, Tutorials & Articles or Community under any list marker, a bare URL, an autolink, a reference link, HTML, a heading, a table row in a prose section, or prose itself. The gate read table rows only, so all of these passed as "No new entries" and merged themselves. Both sides go through `validate.py --fix` first, as the tidy bot would, so its sorting, re-padding and trimming never count; every other line is then compared in order as written, blank lines and indentation included, because four spaces turn a fence or a paragraph into code, a blank line ends a table and a second code fence swallows what follows. Only a table's header and separator lose their padding, which a wider row changes. Adding, editing or removing a table row still merges itself.
+- `validate.py` keeps a table row's name, description and Works with plain text, by character rather than by link shape: a URL, a markdown link, `@` (GitHub autolinks an email on any domain), a backslash, `<`, `>` or an HTML entity (`&#64;` is an `@`) in one is an error, and so is a row with cells after Works with (a fourth cell, or an escaped `\|` that splits one), which GitHub renders and nothing read. A row's name cannot hold `[`, `]` or `|` (a nested link or image, or a cut cell), and its URL cannot hold a parenthesis, bracket, quote, backslash or space, which ends the link early and lets GitHub autolink the rest of the cell. So a link cannot ride inside a table row. The issue form refuses the same characters in a name or description. No listed entry had any.
+- `validate.py` requires each skill and Collections table to be one block: the header, then the separator, then only entry rows, with no blank or other line inside. A blank line split a table, and a row moved above the separator became its header, while every row still parsed.
+- `validate.py` rejects a control character (other than tab), a Unicode line break (U+0085, U+2028, U+2029) or a non-ASCII or zero-width space anywhere in `README.md` (GitHub trims only ASCII space and tab, so a no-break space in a separator collapsed its table), and `check_submission.py` now splits lines where `validate.py` and GitHub do. Python's `splitlines()` breaks on those characters and nothing else does, so a row hidden behind one was read by the gate and not by the validator.
+- `CHANGELOG.md` no longer merges itself. The gate never read it, so a link added there merged unchecked; `README.md` is the one file a pull request can touch and still auto-merge.
+
+### Fixed
+
+- `auto-merge.yml` arms auto-merge with `--match-head-commit` on the event's head, after checking the head did not move while the changed files were read, so a push landing between the file check and the arm call can no longer be armed. A later change to a file outside the list, or the `no-auto-merge` or `maintainer-override` label, now switches off an auto-merge the workflow armed, so the label stops it as CONTRIBUTING.md says; one a maintainer armed by hand, and the bot pull requests that issue-to-pr.yml and tidy.yml arm, are left alone. Each GitHub read in that step is its own statement, so a failed call fails the step instead of reading as "not armed" or "no files". `star_check.py` pins its direct merge (`sha`) and its auto-merge (`expectedHeadOid`) to the head it checked.
+- The health report stops with the error when GitHub's GraphQL API answers a batch with anything other than `NOT_FOUND`. A rate-limited batch had listed all 62 GitHub entries under "Gone: remove these".
+- `check_new_links.py` retries a network error or a 5xx up to `max_retries` times, `retry_wait_time` seconds apart, both read from `lychee.toml` (3 and 5), as lychee does. One timeout had turned the required Check links red, which a contributor on a fork cannot re-run.
+- On the site at 640px and below, buttons, tabs, category chips and selects are 44px tall (were 34 to 40px), the brand no longer wraps to two lines at 375px, and the sticky search sits under the bar instead of 4px beneath it. Cards on the Skills tab no longer run past a 375px screen: one long, unwrapped source line (`muratcankoylan/Agent-Skills-for-Context-Engineering`) had widened the single column to 405px on a 343px grid, clipping every card's right edge; it now ellipsizes.
+- The pull request template's CONTRIBUTING.md link was relative, and GitHub keeps relative links as written in a pull request body, so it 404ed; it is a full URL now.
+- `ruff` 0.16.6 to 0.17.3 and `pytest` 9.0.3 to 9.2.0, with `requirements-dev.txt` recompiled. Its regeneration command in `requirements-dev.in` now names `--python-version 3.14`, which the lock header has said since #2, instead of `.python-version`'s 3.15.
+
 ## [0.2.0] - 2026-11-01
 
 ### Added

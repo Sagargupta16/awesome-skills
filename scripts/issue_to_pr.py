@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -29,7 +28,6 @@ ROOT = Path(__file__).resolve().parent.parent
 # Tutorials & Articles, Community) take prose a maintainer writes.
 AUTOMATED = [*validate.SKILL_CATEGORIES, "Collections"]
 NO_RESPONSE = "_No response_"
-URL_RE = re.compile(r"^https://[^\s()<>|\[\]]+$")
 
 
 class Rejected(ValueError):
@@ -59,14 +57,20 @@ def _clean_name(raw: str) -> str:
         raise Rejected("The name is empty.")
     if any(ch in name for ch in "[]|"):
         raise Rejected("The name cannot contain `[`, `]` or `|`.")
+    if validate.LINKISH_RE.search(name):
+        raise Rejected(
+            "The name is plain text: no links, `@`, `\\`, `<`, `>` or HTML entities."
+        )
     return name
 
 
 def _clean_url(raw: str) -> str:
     url = raw.strip().rstrip("/")
-    if not URL_RE.match(url):
+    # validate.py's own row rule, so a form row never fails Validate format later
+    if not validate.ROW_URL_RE.match(url):
         raise Rejected(
-            "The URL must be one https:// link with no spaces, brackets or `|`."
+            "The URL must be one https:// link with no spaces, brackets, braces, "
+            "quotes, backslashes or `|`."
         )
     return url
 
@@ -77,6 +81,10 @@ def _clean_description(raw: str) -> str:
         raise Rejected("The description is empty.")
     if "|" in desc:
         raise Rejected("The description cannot contain `|`.")
+    if validate.LINKISH_RE.search(desc):
+        raise Rejected(
+            "The description is plain text: no links, `@`, `\\`, `<`, `>` or HTML entities."
+        )
     desc = desc[0].upper() + desc[1:]
     if len(desc) > validate.MAX_DESC:
         raise Rejected(

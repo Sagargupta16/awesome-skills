@@ -23,6 +23,7 @@ import argparse
 import concurrent.futures
 import re
 import sys
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -47,15 +48,25 @@ UA = (
 )
 
 
-def load_lychee_settings() -> tuple[set[int], list[re.Pattern], int]:
-    """Read accept codes, host exclusions and timeout out of lychee.toml."""
+def load_lychee_settings() -> tuple[set[int], list[re.Pattern], int, int, int]:
+    """Read accept codes, exclusions, timeout and retries out of lychee.toml.
+
+    Returns (accept, excludes, timeout, max_retries, retry_wait_time). The retry
+    pair is lychee's own defaults when the file leaves it out.
+    """
     if not LYCHEE_CONFIG.exists():
-        return set(DEFAULT_ACCEPT), [], 30
+        return set(DEFAULT_ACCEPT), [], 30, 3, 1
     with LYCHEE_CONFIG.open("rb") as fh:
         cfg = tomllib.load(fh)
     accept = {int(c) for c in cfg.get("accept", DEFAULT_ACCEPT)}
     excludes = [re.compile(p) for p in cfg.get("exclude", [])]
-    return accept, excludes, int(cfg.get("timeout", 30))
+    return (
+        accept,
+        excludes,
+        int(cfg.get("timeout", 30)),
+        int(cfg.get("max_retries", 3)),
+        int(cfg.get("retry_wait_time", 1)),
+    )
 
 
 def links_in(text: str) -> set[str]:
@@ -101,16 +112,30 @@ def links_at_head() -> set[str]:
     return found
 
 
-def check(url: str, timeout: int) -> tuple[str, object]:
+def fetch_status(url: str, timeout: int) -> object:
     request = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return url, response.status
+            return response.status
     except urllib.error.HTTPError as exc:
-        return url, exc.code
+        return exc.code
     # URLError and TimeoutError both derive from OSError, so this covers all three.
     except OSError as exc:
-        return url, f"unreachable: {type(exc).__name__}"
+        return f"unreachable: {type(exc).__name__}"
+
+
+def check(url: str, timeout: int, retries: int, wait: int) -> tuple[str, object]:
+    """A URL's status, retried as lychee retries: on a network error or a 5xx.
+
+    Without the retries one timeout on a new link turned the required Check
+    links red, and a contributor on a fork cannot re-run it.
+    """
+    for attempt in range(retries + 1):
+        status = fetch_status(url, timeout)
+        transient = not isinstance(status, int) or status >= 500
+        if not transient or attempt == retries:
+            return url, status
+        time.sleep(wait)
 
 
 def partition_new(base_ref: str, excludes) -> tuple[list[str], list[str]]:
@@ -126,11 +151,13 @@ def partition_new(base_ref: str, excludes) -> tuple[list[str], list[str]]:
     return [u for u in new if u not in excluded], skipped
 
 
-def check_all(urls, accept: set[int], timeout: int) -> list[tuple[object, str]]:
+def check_all(
+    urls, accept: set[int], timeout: int, retries: int, wait: int
+) -> list[tuple[object, str]]:
     """Check every URL concurrently, printing each verdict, and return the dead."""
     dead: list[tuple[object, str]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        futures = [pool.submit(check, u, timeout) for u in urls]
+        futures = [pool.submit(check, u, timeout, retries, wait) for u in urls]
         for future in concurrent.futures.as_completed(futures):
             url, status = future.result()
             ok = isinstance(status, int) and status in accept
@@ -159,7 +186,7 @@ def main() -> int:
     ap.add_argument("--base-ref", default="origin/main", help="ref to compare against")
     args = ap.parse_args()
 
-    accept, excludes, timeout = load_lychee_settings()
+    accept, excludes, timeout, retries, wait = load_lychee_settings()
     to_check, skipped = partition_new(args.base_ref, excludes)
 
     if not to_check:
@@ -169,7 +196,7 @@ def main() -> int:
         return 0
 
     print(f"Checking {len(to_check)} new link(s) against {args.base_ref}.\n")
-    dead = check_all(to_check, accept, timeout)
+    dead = check_all(to_check, accept, timeout, retries, wait)
 
     if skipped:
         print(f"\n{len(skipped)} new link(s) on a host lychee.toml excludes:")

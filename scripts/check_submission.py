@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import difflib
 import http.client
+import io
 import json
 import os
 import posixpath
@@ -38,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import gitref
+import validate
 
 API = "https://api.github.com"
 
@@ -419,11 +422,21 @@ def parse_frontmatter(text: str) -> tuple[dict, set] | None:
     return fields, risky
 
 
+def readme_lines(text: str) -> list:
+    """README lines split where validate.py and GitHub split them.
+
+    That is a newline, a carriage return or both, and nothing else:
+    str.splitlines() also breaks on a form feed or U+2028, so a row hidden
+    behind one used to be read here and not by validate.py.
+    """
+    return io.StringIO(text, newline="").readlines()
+
+
 def parse_rows(text: str) -> dict:
     """Map normalised URL to Submission for every table row in a README."""
     rows = {}
-    for line in text.splitlines():
-        m = ROW_RE.match(line)
+    for line in readme_lines(text):
+        m = ROW_RE.match(line.rstrip("\r\n"))
         if not m:
             continue
         cells = [c.strip() for c in m.group("rest").split("|")]
@@ -438,13 +451,8 @@ def parse_rows(text: str) -> dict:
     return rows
 
 
-def added_rows(base_ref: str) -> list:
-    """Entries present at HEAD but not at the base.
-
-    Compares the two parsed entry sets rather than reading `+` lines from the
-    diff. Reordering a table rewrites every moved row, so a diff-based reading
-    reports untouched entries as new submissions and then blocks the pull
-    request over rot that was already on the base branch.
+def base_readme(base_ref: str) -> str | None:
+    """README.md at `base_ref`, or None when the ref is malformed or unreadable.
 
     `base_ref` arrives from a command line, so it is checked against the shape of
     a git ref first. Nothing is run through a shell, but a value beginning with
@@ -455,7 +463,7 @@ def added_rows(base_ref: str) -> list:
             f"error: {base_ref!r} is not a valid git ref for --base-ref",
             file=sys.stderr,
         )
-        return []
+        return None
 
     text, detail = gitref.show(base_ref, "README.md")
     if text is None:
@@ -463,19 +471,110 @@ def added_rows(base_ref: str) -> list:
             f"warning: could not read README.md at {base_ref}: {detail}",
             file=sys.stderr,
         )
-        return []
+    return text
 
+
+def added_rows(base_ref: str) -> list:
+    """Entries present at HEAD but not at the base.
+
+    Compares the two parsed entry sets rather than reading `+` lines from the
+    diff. Reordering a table rewrites every moved row, so a diff-based reading
+    reports untouched entries as new submissions and then blocks the pull
+    request over rot that was already on the base branch.
+    """
+    text = base_readme(base_ref)
+    if text is None:
+        return []
     before = parse_rows(text)
     after = parse_rows(Path("README.md").read_text(encoding="utf-8"))
     return [sub for key, sub in after.items() if key not in before]
 
 
+def _table_line(line: str) -> str:
+    """A table header or separator without its padding, which follows the widest row."""
+    text = re.sub(r"\s*\|\s*", "|", line.strip())
+    if set(text) <= set("|:-"):
+        text = re.sub(r"-+", "-", text)  # a separator, whatever its width
+    return text
+
+
+def table_row_lines(lines: list) -> set:
+    """Line numbers of the rows in the skill and Collections tables."""
+    entries, _, _ = validate.parse(lines)
+    return {e.line for s in validate.TABLE_HEADERS for e in entries.get(s, [])}
+
+
+def outside_rows(lines: list) -> tuple:
+    """(fixed lines, [(line number, text)] for every line that is not a table row).
+
+    Both sides go through `validate.py --fix` first, as the tidy bot would, so its
+    sorting, re-padding and trimming never count. Every other line is compared as
+    written, blank lines and indentation included: four spaces turn a fence or a
+    paragraph into code, and a blank line ends a table. Only a table's header and
+    separator lose their padding, since a wider row re-pads them.
+    """
+    fixed = validate.fix(lines)
+    rows = table_row_lines(fixed)
+    kept = []
+    for i, line in enumerate(fixed, 1):
+        if i in rows:
+            continue
+        text = line.rstrip("\n")
+        kept.append((i, _table_line(text) if text.startswith("|") else text))
+    return fixed, kept
+
+
+def changed_lines(base_ref: str) -> list:
+    """README lines added, removed or moved outside the skill tables, held.
+
+    Only a table row is checked: added_rows() inspects a new one, and validate.py
+    keeps its cells plain text. Everything else (a bullet in Official or Tools, a
+    bare URL, a reference link, HTML, a heading, prose) used to pass as "No new
+    entries" and merge itself, so CONTRIBUTING.md has a maintainer review it.
+    Those lines are compared in order, not as a set: a second copy of an existing
+    line, such as a code fence, changes how everything after it renders.
+    """
+    text = base_readme(base_ref)
+    if text is None:
+        return []
+    base, before = outside_rows(readme_lines(text))
+    head, after = outside_rows(
+        readme_lines(Path("README.md").read_text(encoding="utf-8"))
+    )
+    matcher = difflib.SequenceMatcher(
+        None, [t for _, t in before], [t for _, t in after], autojunk=False
+    )
+    held = Submission("README.md outside the skill tables", "", "", "")
+
+    def show(line: str) -> str:
+        text = line.rstrip("\n").replace("`", "'")[:100]
+        return f"`{text}`" if text.strip() else "a blank line"
+
+    for tag, b1, b2, h1, h2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        for n, _ in before[b1:b2]:
+            held.hard.append(f"Removes base line {n}: {show(base[n - 1])}")
+        for n, _ in after[h1:h2]:
+            held.hard.append(f"Adds line {n}: {show(head[n - 1])}")
+    if not held.hard:
+        return []
+    held.hard.append(
+        "Only skill table rows are checked for a SKILL.md and a licence. A "
+        f"maintainer reviews the lines above and applies `{OVERRIDE_LABEL}` to merge."
+    )
+    return [held]
+
+
 def inspect(sub: Submission) -> None:
     target = parse_github_url(sub.url)
     if target is None:
-        sub.soft.append(
-            "Not a GitHub repository or folder URL, so it cannot be checked "
-            "automatically. A maintainer must verify it by hand."
+        # Blocking, not a note: a note never stops auto-merge, so the entry would
+        # land with no SKILL.md, licence or activity check at all.
+        sub.hard.append(
+            "Not a GitHub repository or folder URL, so it cannot be checked for a "
+            "SKILL.md, a licence or recent activity. A maintainer checks it by hand "
+            f"and applies `{OVERRIDE_LABEL}` to merge it."
         )
         return
 
@@ -520,7 +619,11 @@ def lookup_repo(sub: Submission, slug: str) -> dict | None:
                 f"`{slug}` returns 404. The repository is private, renamed, or deleted."
             )
         else:
-            sub.soft.append(f"Could not reach the GitHub API for `{slug}` ({err}).")
+            # A failed lookup verified nothing, so it fails closed.
+            sub.hard.append(
+                f"Could not reach the GitHub API for `{slug}` ({err}), so nothing "
+                f"about this entry was verified. Re-run the check."
+            )
         return None
 
     stale_days = days_since(data["pushed_at"])
@@ -594,9 +697,10 @@ def report_skill(sub: Submission, target: Target, ref: str, search: Search) -> N
         else f"the repository on `{ref}`"
     )
     if search.error:
-        sub.soft.append(
-            f"Could not list the repository tree at {where} ({search.error}); "
-            f"SKILL.md not verified."
+        sub.hard.append(
+            f"Could not list the repository tree at {where} ({search.error}), so "
+            f"the SKILL.md was not verified. A branch name with a slash reads as "
+            f"part of the folder: link a one-segment ref, or re-run the check."
         )
         return
     if not search.folder_found and not search.truncated:
@@ -609,9 +713,10 @@ def report_skill(sub: Submission, target: Target, ref: str, search: Search) -> N
     sub.facts["SKILL.md files"] = len(search.candidates)
     if search.skill is None:
         if not search.candidates and search.truncated:
-            sub.soft.append(
+            sub.hard.append(
                 "The repository tree is too large for one listing and no SKILL.md "
-                "was in the part GitHub returned. Confirm by hand."
+                "was in the part GitHub returned, so it was not verified. A "
+                f"maintainer checks it by hand and applies `{OVERRIDE_LABEL}`."
             )
         elif not search.candidates:
             sub.hard.append(
@@ -861,6 +966,7 @@ def main() -> int:
     subs = added_rows(args.base_ref)
     for s in subs:
         inspect(s)
+    subs += changed_lines(args.base_ref)
 
     override = OVERRIDE_LABEL in {label.strip() for label in args.labels.split(",")}
     report, failing = render(subs, override)

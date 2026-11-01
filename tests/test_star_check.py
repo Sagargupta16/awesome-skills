@@ -205,12 +205,18 @@ def _files(*names):
     return ([{"filename": n} for n in names], None)
 
 
-def _release_routes(state: str, *files: str) -> dict:
+def _release_routes(state: str, *files: str, labels=(), draft=False) -> dict:
+    pull = {
+        "mergeable_state": state,
+        "head": {"sha": "abc"},
+        "labels": [{"name": n} for n in labels],
+        "draft": draft,
+    }
     return {
         ("GET", f"repos/{star_check.REPO}/pulls/7/files"): _files(
             *(files or ("README.md",))
         ),
-        ("GET", f"repos/{star_check.REPO}/pulls/7"): ({"mergeable_state": state}, None),
+        ("GET", f"repos/{star_check.REPO}/pulls/7"): (pull, None),
     }
 
 
@@ -221,7 +227,7 @@ def test_a_held_pull_request_with_pending_checks_gets_auto_merge(fake):
 
     graphql = [payload for m, p, payload in api.calls if p == "graphql"]
     assert len(graphql) == 1
-    assert graphql[0]["variables"] == {"id": "PR_7"}
+    assert graphql[0]["variables"] == {"id": "PR_7", "head": "abc"}
     assert not any(m == "PUT" for m, _ in api.writes())
 
 
@@ -233,7 +239,7 @@ def test_a_held_pull_request_that_can_merge_now_is_merged(fake, state):
     star_check.release(_pr(labels=["missing-star"]), dry_run=False)
 
     assert api.writes() == [("PUT", f"repos/{star_check.REPO}/pulls/7/merge")]
-    assert api.calls[-1][2] == {"merge_method": "squash"}
+    assert api.calls[-1][2] == {"merge_method": "squash", "sha": "abc"}
 
 
 def test_a_pull_request_touching_a_workflow_is_never_released(fake):
@@ -247,7 +253,7 @@ def test_a_pull_request_touching_a_workflow_is_never_released(fake):
 
 @pytest.mark.parametrize("stop", sorted(star_check.STOP_LABELS))
 def test_a_maintainer_stop_label_keeps_a_pull_request_held(fake, stop):
-    api = fake(_release_routes("clean"))
+    api = fake(_release_routes("clean", labels=[stop]))
 
     star_check.release(_pr(labels=[stop]), dry_run=False)
 
@@ -255,7 +261,7 @@ def test_a_maintainer_stop_label_keeps_a_pull_request_held(fake, stop):
 
 
 def test_a_draft_is_never_released(fake):
-    api = fake(_release_routes("clean"))
+    api = fake(_release_routes("clean", draft=True))
 
     star_check.release(_pr() | {"draft": True}, dry_run=False)
 

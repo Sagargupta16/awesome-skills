@@ -92,6 +92,31 @@ ROW_RE = re.compile(
 BULLET_RE = re.compile(r"^- \[(?P<name>[^\]]+)\]\((?P<url>[^)\s]+)\) - (?P<desc>.+)$")
 TOC_RE = re.compile(r"^\s*- \[(?P<label>[^\]]+)\]\(#(?P<anchor>[a-z0-9-]+)\)\s*$")
 
+# Names, descriptions and Works with are plain text, checked by character rather
+# than by link shape: a URL, a markdown link, `@` (GitHub autolinks an email on
+# any domain), a backslash escape, `<` or `>` (HTML and autolinks), and an HTML
+# entity (`&#64;` is an `@`). A link inside a cell is not an entry
+# check_submission.py inspects, so it would merge with nothing looked at.
+LINKISH_RE = re.compile(r"://|\]\(|www\.|[@\\<>]|&#?\w+;")
+
+# A table row's URL as both the gate and GitHub read it. No parenthesis,
+# bracket, quote, backslash or space: one of those ends the link early, and the
+# rest of the cell renders as text that GitHub then autolinks.
+ROW_URL_RE = re.compile(r"^https://[A-Za-z0-9.-]+(?:[/?#][\w./~%+=&:@!,;*#?-]*)?$")
+
+# A row's name is link text: a bracket opens a nested link or image, and a pipe
+# ends the cell, hiding the description and Works with.
+NAME_MARKUP_RE = re.compile(r"[\[\]|]")
+
+# Characters with no place in the list: controls other than tab, non-ASCII and
+# zero-width spaces (GitHub trims only ASCII space and tab, so a no-break space
+# in a separator collapses its table), and the line
+# breaks Python's str.splitlines() honours but GitHub does not (U+0085, U+2028,
+# U+2029). Each one lets two readers of the same file see different lines.
+STRAY_CHAR_RE = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x85\u2028\u2029\xa0\u1680\u2000-\u200d\u202f\u205f\u2060\u3000\ufeff]"
+)
+
 # Re-exported so the pattern has one definition for all three gate scripts.
 REF_RE = gitref.REF_RE
 
@@ -104,6 +129,8 @@ class Entry:
     desc: str
     third: str
     section: str
+    # cells after Works with: GitHub renders them, the checks below read none
+    extra: str = ""
 
 
 @dataclass
@@ -181,6 +208,7 @@ def parse_entry(line: str, lineno: int, section: str):
             cells[0] if cells else "",
             cells[1] if len(cells) > 1 else "",
             section,
+            "|".join(cells[2:]).strip(),
         )
 
     bm = BULLET_RE.match(line)
@@ -352,6 +380,34 @@ def check_table_headers(lines, heading_lines, rep: Report) -> None:
             rep.err(line_no, f"section '{section}' header is {got}, expected {cols}")
 
 
+def check_table_shape(lines, heading_lines, rep: Report) -> None:
+    """Each table section holds one unbroken block: header, separator, then rows.
+
+    A blank line inside a table ends it, and a row moved above the separator
+    becomes the header. Both change what GitHub renders while every row still
+    parses, so they are errors here rather than something a reviewer must spot.
+    """
+    starts = sorted(heading_lines.values())
+    for section in TABLE_HEADERS:
+        start = heading_lines.get(section)
+        if start is None:
+            continue
+        end = next((h for h in starts if h > start), len(lines) + 1)
+        table = [i for i in range(start + 1, end) if lines[i - 1].startswith("|")]
+        if not table:
+            continue  # check_table_headers reports a missing table
+        gap = next((i for i in range(table[0], table[-1]) if i not in table), None)
+        if gap is not None:
+            rep.err(gap, f"table in '{section}' is split by a non-table line")
+        if len(table) < 2 or not all(
+            SEPARATOR_CELL_RE.match(c) for c in _cells(lines[table[1] - 1])
+        ):
+            rep.err(table[0], f"table in '{section}' has no separator under its header")
+        for i in table[2:]:
+            if not ROW_RE.match(lines[i - 1].rstrip("\n")):
+                rep.err(i, f"line in the '{section}' table is not an entry row")
+
+
 def check_empty_sections(entries, heading_lines, rep: Report) -> None:
     """Note every entry section that has nothing in it yet.
 
@@ -388,6 +444,39 @@ def check_third_column(e: Entry, rep: Report) -> None:
 def check_entry(e: Entry, is_bullet: bool, rep: Report) -> None:
     if not e.url.startswith("https://"):
         rep.err(e.line, f"'{e.name}' URL must be https:// (got {e.url})")
+    elif not is_bullet and not ROW_URL_RE.match(e.url):
+        rep.err(
+            e.line,
+            f"'{e.name}' URL holds a character that can end a link early, such as "
+            f"a parenthesis, bracket, brace, quote, backslash or space",
+        )
+    # Table rows only: a bullet is held for a maintainer by check_submission.py,
+    # and a maintainer may write `<` or `@` in one.
+    cells = (
+        ()
+        if is_bullet
+        else (
+            ("name", e.name),
+            ("description", e.desc),
+            ("Works with", e.third),
+        )
+    )
+    for label, text in cells:
+        if LINKISH_RE.search(text):
+            rep.err(
+                e.line,
+                f"'{e.name}' {label} holds a link or markup (a URL, `@`, a "
+                f"backslash, `<`, `>` or an HTML entity); it must be plain text",
+            )
+    if not is_bullet and NAME_MARKUP_RE.search(e.name):
+        rep.err(e.line, f"'{e.name}' name cannot contain `[`, `]` or `|`")
+    # A fourth cell, or an escaped `\|` that splits one, renders unread.
+    if e.extra:
+        rep.err(
+            e.line,
+            f"'{e.name}' row has cells after Works with; a row has exactly three, "
+            f"and a description cannot contain `|`",
+        )
     if not e.desc:
         rep.err(e.line, f"'{e.name}' has an empty description")
         return
@@ -504,6 +593,20 @@ def check_link_target(
 
 # The lines git writes around each side of an unresolved conflict.
 CONFLICT_MARKER_RE = re.compile(r"^(?:<<<<<<< .*|>>>>>>> .*|=======)$")
+
+
+def check_stray_characters(lines, rep: Report) -> None:
+    """Flag a control character or a Unicode line break anywhere in the file.
+
+    check_submission.py, this script and GitHub must agree on where each line
+    ends. A form feed or U+2028 is a line break to str.splitlines() and to
+    nothing else, so a row hidden behind one was read by one check and not the
+    other. No list content needs any of them.
+    """
+    for i, raw in enumerate(lines, 1):
+        found = STRAY_CHAR_RE.search(raw.rstrip("\r\n"))
+        if found:
+            rep.err(i, f"contains the control character U+{ord(found.group()):04X}")
 
 
 def check_conflict_markers(lines, rep: Report) -> None:
@@ -647,10 +750,12 @@ def run_checks(lines) -> tuple:
     """Return (errors, entry_count, notes) for a README given as a list of lines."""
     rep = Report()
     entries, heading_lines, order = parse(lines)
+    check_stray_characters(lines, rep)
     check_conflict_markers(lines, rep)
     check_structure(lines, order, heading_lines, rep)
     check_toc(lines, heading_lines, rep)
     check_table_headers(lines, heading_lines, rep)
+    check_table_shape(lines, heading_lines, rep)
     check_empty_sections(entries, heading_lines, rep)
     check_entry_syntax(lines, rep)
     check_entries(entries, rep)

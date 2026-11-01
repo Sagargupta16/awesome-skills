@@ -109,7 +109,18 @@ def fetch(entries):
             for i, entry in enumerate(chunk)
         ]
         data = graphql("query{" + " ".join(parts) + "}")
-        payload = data.get("data") or {}
+        # A repository that no longer exists answers NOT_FOUND on its own alias,
+        # which is what "gone" means. Any other error (a rate limit, a timeout)
+        # means the batch went unanswered, and reading its empty aliases as gone
+        # would tell the maintainer to delete live entries, so stop instead.
+        failed = [e for e in data.get("errors") or [] if e.get("type") != "NOT_FOUND"]
+        if failed or data.get("data") is None:
+            first = (failed or [{}])[0]
+            sys.exit(
+                f"error: GitHub GraphQL did not answer the batch: "
+                f"{first.get('type')} {first.get('message')}"
+            )
+        payload = data["data"]
         for i, entry in enumerate(chunk):
             results[entry] = payload.get(f"r{i}")
     return results
