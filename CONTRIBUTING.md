@@ -40,9 +40,9 @@ Entries in the skill categories and in **Collections** are table rows in this ex
 
 You do not need to line up the pipes with the rows around yours. The tables are padded so the list passes [awesome-lint](https://github.com/sindresorhus/awesome-lint), and a bot re-pads them after new rows land. When a row wider than the rest widens its table, that re-padding can leave an open pull request in conflict with `main`; merging `main` into your branch, keeping `main`'s version of the table plus your row, and running `python scripts/validate.py --fix` clears it, or a maintainer can.
 
-- **Name** -- the skill or collection name, as a user would recognise it. Keep it short. Plain text: no links or HTML.
+- **Name** -- the skill or collection name, as a user would recognise it. Keep it short. Plain text: no links, `@`, `\`, `<`, `>` or HTML entities.
 - **URL** -- a direct `https://` link to the repository, or to the skill's folder inside one (`https://github.com/org/repo/tree/main/skills/foo`). Link the folder when the repository holds several skills and you are adding one of them. No tracking parameters, no redirect shorteners. The checks read GitHub, so a skill hosted anywhere else is held for a maintainer to check by hand.
-- **Description** -- what it does, in **80 characters or fewer**. Start with a capital letter. No trailing period. Plain text: no links, URLs, email addresses, HTML or `|`. No em-dash or en-dash; write `--` or `-` instead. Describe the function, not the pitch: "Review pull requests for security and style issues" rather than "The ultimate AI code reviewer".
+- **Description** -- what it does, in **80 characters or fewer**. Start with a capital letter. No trailing period. Plain text: no links, URLs, `@`, `\`, `<`, `>`, HTML entities or `|`. No em-dash or en-dash; write `--` or `-` instead. Describe the function, not the pitch: "Review pull requests for security and style issues" rather than "The ultimate AI code reviewer".
 - **Works with** -- the agents the skill supports, comma-separated, from exactly this list: `Claude Code`, `Codex`, `Cursor`, `Gemini CLI`, `Copilot`, or `Any`. Name an agent when the skill's README says it supports it or you have run it there. Use `Any` on its own, and only when the skill sticks to the open standard: plain `SKILL.md` frontmatter, and instructions and scripts that assume no one agent's tools, commands or plugin format.
 
 Example:
@@ -50,6 +50,8 @@ Example:
 ```markdown
 | [Acme Review](https://github.com/acme/skills/tree/main/review) | Review pull requests against the Acme style guide | Claude Code, Codex |
 ```
+
+Keep each table in one piece: the header and separator first, then the rows, with no blank line between them.
 
 The `Official`, `Tools`, `Tutorials & Articles`, and `Community` sections are bullet lists instead:
 

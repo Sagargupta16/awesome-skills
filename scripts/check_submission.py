@@ -25,6 +25,7 @@ import argparse
 import base64
 import difflib
 import http.client
+import io
 import json
 import os
 import posixpath
@@ -421,11 +422,21 @@ def parse_frontmatter(text: str) -> tuple[dict, set] | None:
     return fields, risky
 
 
+def readme_lines(text: str) -> list:
+    """README lines split where validate.py and GitHub split them.
+
+    That is a newline, a carriage return or both, and nothing else:
+    str.splitlines() also breaks on a form feed or U+2028, so a row hidden
+    behind one used to be read here and not by validate.py.
+    """
+    return io.StringIO(text, newline="").readlines()
+
+
 def parse_rows(text: str) -> dict:
     """Map normalised URL to Submission for every table row in a README."""
     rows = {}
-    for line in text.splitlines():
-        m = ROW_RE.match(line)
+    for line in readme_lines(text):
+        m = ROW_RE.match(line.rstrip("\r\n"))
         if not m:
             continue
         cells = [c.strip() for c in m.group("rest").split("|")]
@@ -479,12 +490,11 @@ def added_rows(base_ref: str) -> list:
     return [sub for key, sub in after.items() if key not in before]
 
 
-def _normal(line: str) -> str:
-    """A README line without its spacing or table padding, so re-padding, re-sorting
-    or trimming (what `validate.py --fix` does) never reads as a change."""
-    text = re.sub(r"\s*\|\s*", "|", " ".join(line.split()))
-    if text and set(text) <= set("|:-"):
-        text = re.sub(r"-+", "-", text)  # a separator row, whatever its width
+def _table_line(line: str) -> str:
+    """A table header or separator without its padding, which follows the widest row."""
+    text = re.sub(r"\s*\|\s*", "|", line.strip())
+    if set(text) <= set("|:-"):
+        text = re.sub(r"-+", "-", text)  # a separator, whatever its width
     return text
 
 
@@ -494,11 +504,24 @@ def table_row_lines(lines: list) -> set:
     return {e.line for s in validate.TABLE_HEADERS for e in entries.get(s, [])}
 
 
-def outside_rows(lines: list) -> list:
-    """(line number, normalised text) for each non-blank line that is not a row."""
-    rows = table_row_lines(lines)
-    numbered = ((i, _normal(line)) for i, line in enumerate(lines, 1) if i not in rows)
-    return [(i, norm) for i, norm in numbered if norm]
+def outside_rows(lines: list) -> tuple:
+    """(fixed lines, [(line number, text)] for every line that is not a table row).
+
+    Both sides go through `validate.py --fix` first, as the tidy bot would, so its
+    sorting, re-padding and trimming never count. Every other line is compared as
+    written, blank lines and indentation included: four spaces turn a fence or a
+    paragraph into code, and a blank line ends a table. Only a table's header and
+    separator lose their padding, since a wider row re-pads them.
+    """
+    fixed = validate.fix(lines)
+    rows = table_row_lines(fixed)
+    kept = []
+    for i, line in enumerate(fixed, 1):
+        if i in rows:
+            continue
+        text = line.rstrip("\n")
+        kept.append((i, _table_line(text) if text.startswith("|") else text))
+    return fixed, kept
 
 
 def changed_lines(base_ref: str) -> list:
@@ -514,24 +537,26 @@ def changed_lines(base_ref: str) -> list:
     text = base_readme(base_ref)
     if text is None:
         return []
-    base = text.splitlines(keepends=True)
-    head = Path("README.md").read_text(encoding="utf-8").splitlines(keepends=True)
-    before, after = outside_rows(base), outside_rows(head)
+    base, before = outside_rows(readme_lines(text))
+    head, after = outside_rows(
+        readme_lines(Path("README.md").read_text(encoding="utf-8"))
+    )
     matcher = difflib.SequenceMatcher(
         None, [t for _, t in before], [t for _, t in after], autojunk=False
     )
     held = Submission("README.md outside the skill tables", "", "", "")
 
     def show(line: str) -> str:
-        return line.strip().replace("`", "'")[:100]
+        text = line.rstrip("\n").replace("`", "'")[:100]
+        return f"`{text}`" if text.strip() else "a blank line"
 
     for tag, b1, b2, h1, h2 in matcher.get_opcodes():
         if tag == "equal":
             continue
         for n, _ in before[b1:b2]:
-            held.hard.append(f"Removes base line {n}: `{show(base[n - 1])}`")
+            held.hard.append(f"Removes base line {n}: {show(base[n - 1])}")
         for n, _ in after[h1:h2]:
-            held.hard.append(f"Adds line {n}: `{show(head[n - 1])}`")
+            held.hard.append(f"Adds line {n}: {show(head[n - 1])}")
     if not held.hard:
         return []
     held.hard.append(

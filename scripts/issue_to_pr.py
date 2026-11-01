@@ -60,7 +60,9 @@ def _clean_name(raw: str) -> str:
     if any(ch in name for ch in "[]|"):
         raise Rejected("The name cannot contain `[`, `]` or `|`.")
     if validate.LINKISH_RE.search(name):
-        raise Rejected("The name is plain text: no links or HTML.")
+        raise Rejected(
+            "The name is plain text: no links, `@`, `\\`, `<`, `>` or HTML entities."
+        )
     return name
 
 
@@ -80,7 +82,9 @@ def _clean_description(raw: str) -> str:
     if "|" in desc:
         raise Rejected("The description cannot contain `|`.")
     if validate.LINKISH_RE.search(desc):
-        raise Rejected("The description is plain text: no links or HTML.")
+        raise Rejected(
+            "The description is plain text: no links, `@`, `\\`, `<`, `>` or HTML entities."
+        )
     desc = desc[0].upper() + desc[1:]
     if len(desc) > validate.MAX_DESC:
         raise Rejected(
