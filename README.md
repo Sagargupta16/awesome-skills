@@ -105,12 +105,13 @@ One skill per row. **Works with** names the agents a skill supports; `Any` means
 
 ### Data & Databases
 
-| Skill                                                             | Description                                                                     | Works with                          |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------- |
-| [dbt agent skills](https://github.com/dbt-labs/dbt-agent-skills)  | Skills from dbt Labs for working with dbt projects, lineage and migrations      | Claude Code, Cursor, Copilot        |
-| [MongoDB agent skills](https://github.com/mongodb/agent-skills)   | MongoDB Atlas plugin with skills for connections, queries and stream processing | Claude Code, Codex, Cursor, Copilot |
-| [Neon agent skills](https://github.com/neondatabase/agent-skills) | Skills for Neon serverless PostgreSQL and the services around it                | Claude Code, Cursor                 |
-| [Redis agent skills](https://github.com/redis/agent-skills)       | Redis skills with Claude Code and Codex plugin packaging                        | Claude Code, Codex                  |
+| Skill                                                                                      | Description                                                                     | Works with                          |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------- |
+| [Datacircle](https://github.com/waynehamadi/datacircle-plugin/tree/main/skills/datacircle) | Compare and price GTM APIs from one file of every plan                          | Any                                 |
+| [dbt agent skills](https://github.com/dbt-labs/dbt-agent-skills)                           | Skills from dbt Labs for working with dbt projects, lineage and migrations      | Claude Code, Cursor, Copilot        |
+| [MongoDB agent skills](https://github.com/mongodb/agent-skills)                            | MongoDB Atlas plugin with skills for connections, queries and stream processing | Claude Code, Codex, Cursor, Copilot |
+| [Neon agent skills](https://github.com/neondatabase/agent-skills)                          | Skills for Neon serverless PostgreSQL and the services around it                | Claude Code, Cursor                 |
+| [Redis agent skills](https://github.com/redis/agent-skills)                                | Redis skills with Claude Code and Codex plugin packaging                        | Claude Code, Codex                  |
 
 ### Documents & Office
 
