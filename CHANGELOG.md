@@ -2,6 +2,12 @@
 
 Version headings below are documentation milestones. No git tag or GitHub release has been cut for any of them yet.
 
+## [0.4.0] - 2026-11-10
+
+### Added
+
+- 264 skills and collections, taking the list from 121 to 385 entries (skill and Collections rows from 91 to 355). Candidates came from the public skill lists and the `agent-skills`, `claude-skills`, `claude-code-skills`, `agent-skill`, `claude-skill`, `codex-skills`, `skill-md` and `agentskills` GitHub topics: 2,058 repositories, 1,943 of them pushed within 180 days and neither forks nor archived. The 650 with the most stars went through `check_submission.inspect()`, and only the 472 with no blocking finding and no note were kept. A README read then dropped apps whose `SKILL.md` is incidental, guides, translations of listed packs, skills that imitate a named person, tools built to evade detection or bot protection, and repositories whose star and fork counts are far out of line with their history (a single commit with thousands of stars in a few weeks). Offensive security toolkits and people-locating tools were left for a separate review. Every Works with cell names only the agents the skill's own README supports. By category: Design & Frontend +74, Development +54, Writing & Content +35, Productivity +29, Collections +22, Research & Knowledge +21, DevOps & Cloud +10, Skill Authoring +6, Data & Databases +4, Security +4, Documents & Office +3, Testing & QA +2.
+
 ## [0.3.1] - 2026-11-01
 
 ### Fixed
