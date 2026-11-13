@@ -289,6 +289,7 @@ One skill per row. **Works with** names the agents a skill supports; `Any` means
 | [Visual Skills](https://github.com/smixs/visual-skills)                                    | Video and image prompt skills written with a film director's craft               | Claude Code, Codex, Cursor                      |
 | [Vox Director](https://github.com/Alisa0808/vox-director)                                  | Turn a topic into a paper-collage explainer video with script, voice, captions   | Claude Code, Codex                              |
 | [web-design](https://github.com/xiaopu-ai/web-design)                                      | Write a DESIGN.md spec first, then generate consistent web pages                 | Claude Code                                     |
+| [Yingse](https://github.com/kaiyihe699-max/codex-skills/tree/main/generate-lut) | Generate photo color-grading LUTs with exact-file previews and reusable recipes | Codex |
 
 ### Security
 
