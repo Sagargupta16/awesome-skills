@@ -2,6 +2,12 @@
 
 Version headings below are documentation milestones. No git tag or GitHub release has been cut for any of them yet.
 
+## [0.5.1] - 2026-11-17
+
+### Fixed
+
+- The format comment was never posted. Its first live run (44042139998) logged "comment posted" on #16, but no comment appeared: the job had `pull-requests: read`, which GitHub refuses a pull request comment with, and `format_comment.py` ignored the error. The job now has `pull-requests: write`, and a refused write fails the run with the status code.
+
 ## [0.5.0] - 2026-11-17
 
 ### Added
