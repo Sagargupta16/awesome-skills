@@ -50,7 +50,7 @@ uv pip install --require-hashes -r requirements-dev.txt
 
 `requirements-dev.txt` is a uv-generated universal hash lock; `requirements-dev.in` is the source and carries the regeneration command. Both the pin and `ruff.toml`'s rule set exist so `ruff format --check` cannot flip on a formatter release.
 
-Nine workflows, the same names and behaviour as the sister list:
+Ten workflows, the same names and behaviour as the sister list:
 
 - [lint.yml](.github/workflows/lint.yml) -- `Validate format` (README structure), `Lint and test the gate scripts` (ruff + pytest), `Check links` (lychee over README, CONTRIBUTING, SECURITY, CHANGELOG). PRs to `main`, pushes to `main`, daily 06:00 UTC.
 - [submission-check.yml](.github/workflows/submission-check.yml) -- `Check submitted entries`: the rows a PR adds, against the GitHub API (SKILL.md frontmatter, licence, last push, archived, fork, README). Honours `maintainer-override`. No `paths` filter on purpose: it is a required check, and a path-filtered required check never reports, which hangs auto-merge.
@@ -60,6 +60,7 @@ Nine workflows, the same names and behaviour as the sister list:
 - [issue-to-pr.yml](.github/workflows/issue-to-pr.yml) -- turns a "Suggest a skill" form (label `addition`) for a skill category or Collections into a one-row PR on `submission/issue-N` via `scripts/issue_to_pr.py`, dispatches `lint.yml` and `submission-check.yml` on the branch, arms auto-merge only if the submitter starred, and an hourly sweep closes merged issues with the thank-you text.
 - [thanks.yml](.github/workflows/thanks.yml) -- one thank-you per merged contributor PR, with the site link and the "Listed in" badge; marker `<!-- awesome-skills:thanks -->`, `NOT_BEFORE` 2026-11-01.
 - [tidy.yml](.github/workflows/tidy.yml) -- runs `validate.py --fix` on main and opens or refreshes one `chore/tidy-readme` PR with auto-merge armed.
+- [format-comment.yml](.github/workflows/format-comment.yml) -- on `pull_request_target` and dispatch, `scripts/format_comment.py` reads the PR head's README.md as text (objects fetched, nothing checked out) and keeps one `<!-- awesome-skills:format-check -->` comment listing the problems the PR adds against main (`validate.problem_key`): posted, rewritten on a push, turned into "passes now" once fixed, never posted on a clean PR. A dispatch sweeps every open PR. Not a required check.
 - [star-check.yml](.github/workflows/star-check.yml) -- `missing-star` label and one marker comment on unstarred PRs; on `watch` releases the starrer's held PRs and approves their held runs.
 
 ## Entry points
