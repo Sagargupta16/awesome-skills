@@ -480,6 +480,7 @@ Multi-skill packs and plugin marketplaces, listed once as a whole.
 | [Skills for Architects](https://github.com/AlpacaLabsLLC/skills-for-architects)                                   | Skills for architecture studios, real estate and workplace strategy             | Claude Code, Codex                     |
 | [Sno Station Skills](https://github.com/sno-ai/sno-station-skills)                                                | Team-workflow skills such as cross-vendor peer review and verified delivery     | Claude Code, Codex                     |
 | [Tons of Skills](https://github.com/jeremylongshore/tons-of-skills-marketplace)                                   | Plugin marketplace of 400+ plugins and skills with the ccpi installer CLI       | Claude Code                            |
+| [Viewlify TikTok Skills](https://github.com/benjaminb10/viewlify-mcp)                                            | Three skills for TikTok outlier research, video ideas and a weekly trend brief  | Claude Code                            |
 | [Wondelai skills](https://github.com/wondelai/skills)                                                             | Skills built on business, UX and coding books, plus guided journeys             | Claude Code, Codex, Cursor             |
 | [wshobson/agents](https://github.com/wshobson/agents)                                                             | Plugin marketplace of agents, skills and commands for many coding tools         | Claude Code, Codex, Cursor, Copilot    |
 
