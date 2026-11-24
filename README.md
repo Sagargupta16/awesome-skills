@@ -487,6 +487,7 @@ Multi-skill packs and plugin marketplaces, listed once as a whole.
 
 Validators, linters, installers and registries for skills.
 
+- [Ironheights](https://github.com/Frank-Masciopinto/ironheights) - Open-source local scanner that checks skills for prompt injection, credential reads and persistence before install.
 - [Skill Seekers](https://github.com/yusufkaraaslan/Skill_Seekers) - Converts documentation sites, repositories and PDFs into skills, with conflict detection.
 - [skill-validator](https://github.com/agent-ecosystem/skill-validator) - CLI that validates skill packages against the spec and scores content quality, links and token cost.
 - [skillcheck](https://github.com/Sagargupta16/skillcheck) - Conformance suite that lints SKILL.md against the spec and tests skills on real agent runtimes.
