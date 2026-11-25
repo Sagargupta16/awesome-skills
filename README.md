@@ -143,6 +143,7 @@ One skill per row. **Works with** names the agents a skill supports; `Any` means
 | Skill                                                                          | Description                                                                      | Works with                               |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------- |
 | [Dev Browser](https://github.com/SawyerHood/dev-browser)                       | Browser automation CLI that lets agents drive Chrome with short scripts          | Claude Code, Codex                       |
+| [Oh My Android](https://github.com/ateymoori/oh-my-android/tree/main/skills/android-ui-check) | Check and drive an Android emulator UI, with layout bounds in dp, via MCP        | Claude Code, Codex, Cursor               |
 | [Playwright CLI](https://github.com/microsoft/playwright-cli)                  | Playwright command line tool with a skill for browser automation and web testing | Claude Code, Copilot                     |
 | [Playwright Skill (lackeyjb)](https://github.com/lackeyjb/playwright-skill)    | Skill that has agents write and run Playwright scripts on the fly                | Any                                      |
 | [Playwright Skill (TestDino)](https://github.com/testdino-hq/playwright-skill) | Playwright skill packs split into core, frontend, QA and CI topics               | Any                                      |
